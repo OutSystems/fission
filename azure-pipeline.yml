@@ -129,12 +129,17 @@ stages:
             inputs:
               version: "$(GO_VERSION)"
             displayName: Install Go
-          - task: goreleaser@0
-            inputs:
-              version: 'latest'
-              distribution: 'goreleaser'
-              args: ''
-              workdir: $(ProjectPath)
+          - bash: |
+              echo "Installing goreleaser"
+              sudo apt install goreleaser
+              echo "Running goreleaser build"
+              GOOS=linux GOARCH=amd64 goreleaser build --snapshot --rm-dist --single-target
+#          - task: goreleaser@0
+#            inputs:
+#              version: 'latest'
+#              distribution: 'goreleaser'
+#              args: ''
+#              workdir: $(ProjectPath)
           ########################################################################################################################
           # PUSH TO ACR
           ########################################################################################################################
