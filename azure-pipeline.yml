@@ -42,6 +42,7 @@ trigger:
     include:
       - main-os
       - master
+      - feature/mhh/sprint-7.6/RDDFC-409/Fork_the_main_fission_repo_so_that_we_can_implement_changes
 
 pr: none
 
