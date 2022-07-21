@@ -37,6 +37,19 @@ variables:
   - name: GO_VERSION
     value: "1.18"
 
+resources:
+  repositories:
+    - repository: OutSystems.CICDPlatform.PhoenixServicePipelineTemplates
+      type: github
+      ref: refs/tags/v2
+      name: OutSystems/OutSystems.CICDPlatform.PhoenixServicePipelineTemplates
+      endpoint: OutSystems-CICD Platform-Phoenix Cloud
+    - repository: OutSystems.CICDPlatform.AzureCITemplates
+      type: github
+      ref: refs/tags/v1
+      name: OutSystems/OutSystems.CICDPlatform.AzureCITemplates
+      endpoint: OutSystems-CICD Platform-Phoenix Cloud
+
 trigger:
   branches:
     include:
