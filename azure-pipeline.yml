@@ -84,9 +84,7 @@ stages:
           - template: setup/set-variables-go.yml@OutSystems.CICDPlatform.PhoenixServicePipelineTemplates
             parameters:
               DockerImageName: ${{ parameters.DockerImageName }}
-              DockerFilePath: ${{ parameters.DockerFilePath }}
               ProjectName: ${{ parameters.ProjectName }}
-              DockerBuildContext: ${{ parameters.DockerBuildContext }}
               ProjectSrcFolder: ${{ parameters.ProjectSrcFolder }}
               ProjectPath: ${{ parameters.ProjectPath }}
           # PreSetup Step
@@ -121,9 +119,7 @@ stages:
           - template: setup/set-variables-go.yml@OutSystems.CICDPlatform.PhoenixServicePipelineTemplates
             parameters:
               DockerImageName: ${{ parameters.DockerImageName }}
-              DockerFilePath: ${{ parameters.DockerFilePath }}
               ProjectName: ${{ parameters.ProjectName }}
-              DockerBuildContext: ${{ parameters.DockerBuildContext }}
               ProjectSrcFolder: ${{ parameters.ProjectSrcFolder }}
               ProjectPath: ${{ parameters.ProjectPath }}
           - template: setup/docker-acr-login.yml@OutSystems.CICDPlatform.AzureCITemplates
