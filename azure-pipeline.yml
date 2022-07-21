@@ -1,1 +1,150 @@
+parameters:
+  - name: ProjectName
+    type: string
+    default: 'fission'
+  - name: DockerImageName
+    type: string
+    default: 'fission-bundle'
+  - name: ProjectSrcFolder
+    type: string
+    default: ''
+  - name: ProjectPath
+    type: string
+    default: ''
+  - name: ContainerRegistry
+    type: string
+    default: 'SDLC EdenCore'
+  - name: IsGitLFS
+    type: boolean
+    default: false
+  - name: FetchSubmodules
+    type: boolean
+    default: false
+  - name: RunSetupJob
+    type: boolean
+    default: true
+  - name: DoRelease
+    type: boolean
+    default: true
+  - name: HelmDeploy
+    type: boolean
+    default: true
+  - name: PreSetup
+    type: stepList
+    default: []
 
+variables:
+  - name: GO_VERSION
+    value: "1.18"
+
+trigger:
+  branches:
+    include:
+      - main-os
+      - master
+
+pr: none
+
+stages:
+  - stage: BuildAndPublish
+    displayName: 'Build and Publish'
+    dependsOn: [ ]
+    variables:
+      - group: Phoenix Variables
+      - template: setup/vars.yml@OutSystems.CICDPlatform.PhoenixServicePipelineTemplates
+    jobs:
+      ########################################################################################################################
+      # SETUP JOB - Any setup tasks to run before the parallel jobs
+      ########################################################################################################################
+      - job: Setup
+        displayName: 'Setup'
+        timeoutInMinutes: 10
+        pool:
+          vmImage: 'ubuntu-20.04'
+        dependsOn: []
+        condition: eq(${{ parameters.RunSetupJob }}, true)
+        steps:
+          - template: setup/checkout.yml@OutSystems.CICDPlatform.PhoenixServicePipelineTemplates
+            parameters:
+              IsGitLFS: ${{ parameters.IsGitLFS }}
+          - template: setup/set-variables-go.yml@OutSystems.CICDPlatform.PhoenixServicePipelineTemplates
+            parameters:
+              DockerImageName: ${{ parameters.DockerImageName }}
+              DockerFilePath: ${{ parameters.DockerFilePath }}
+              ProjectName: ${{ parameters.ProjectName }}
+              DockerBuildContext: ${{ parameters.DockerBuildContext }}
+              ProjectSrcFolder: ${{ parameters.ProjectSrcFolder }}
+              ProjectPath: ${{ parameters.ProjectPath }}
+          # PreSetup Step
+          - ${{ each step in parameters.PreSetup }}:
+              - ${{ each pair in step }}:
+                  ${{ pair.key }}: ${{ pair.value }}
+          - template: setup/phoenix-versioning.yml@OutSystems.CICDPlatform.AzureCITemplates
+            parameters:
+              ScriptsDir: $(TemplatePath)
+              WorkingDir: $(ProjectPath)
+              GithubToken: $(GITHUB_TOKEN)
+              GithubConnection: 'SDLC Phoenix Cloud'
+              DoRelease: ${{ parameters.DoRelease }}
+
+      - job: Release
+        displayName: 'Build'
+        dependsOn:
+          - Setup
+        condition: eq(dependencies.Setup.result, 'Succeeded')
+        pool:
+          vmImage: 'ubuntu-20.04'
+        variables:
+          ${{ if eq(parameters.RunSetupJob, true) }}:
+            ServiceVersion: $[ dependencies.Setup.outputs['Version.ServiceVersion'] ]
+          ${{ if ne(parameters.RunSetupJob, true) }}:
+            ServiceVersion: $(Build.BuildId)
+        steps:
+          - template: setup/checkout.yml@OutSystems.CICDPlatform.PhoenixServicePipelineTemplates
+            parameters:
+              IsGitLFS: ${{ parameters.IsGitLFS }}
+              FetchSubmodules: ${{ parameters.FetchSubmodules }}
+          - template: setup/set-variables-go.yml@OutSystems.CICDPlatform.PhoenixServicePipelineTemplates
+            parameters:
+              DockerImageName: ${{ parameters.DockerImageName }}
+              DockerFilePath: ${{ parameters.DockerFilePath }}
+              ProjectName: ${{ parameters.ProjectName }}
+              DockerBuildContext: ${{ parameters.DockerBuildContext }}
+              ProjectSrcFolder: ${{ parameters.ProjectSrcFolder }}
+              ProjectPath: ${{ parameters.ProjectPath }}
+          - template: setup/docker-acr-login.yml@OutSystems.CICDPlatform.AzureCITemplates
+            parameters:
+              ContainerRegistry: ${{ parameters.ContainerRegistry }}
+          - task: GoTool@0
+            inputs:
+              version: "$(GO_VERSION)"
+            displayName: Install Go
+          - task: goreleaser@0
+            inputs:
+              version: 'latest'
+              distribution: 'goreleaser'
+              args: ''
+              workdir: $(ProjectPath)
+          ########################################################################################################################
+          # PUSH TO ACR
+          ########################################################################################################################
+          # Push to Core ACR on pass or fail
+          - template: publish/docker-push.yml@OutSystems.CICDPlatform.AzureCITemplates
+            parameters:
+              ServiceConnection: 'SDLC EdenCore'
+              SourceImageName: $(DockerImageName)
+              SourceImageTag: $(ServiceVersion)
+              Condition: and(succeededOrFailed(), eq('${{ parameters.DoRelease }}', 'true'))
+          # Push image to ECR
+          - task: ECRPushImage@1
+            displayName: 'Publish Docker image to ECR (version tag)'
+            condition: and(succeeded(), eq('${{ parameters.HelmDeploy }}', 'true'))
+            inputs:
+              awsCredentials: 'sdlc_datafabric_core'
+              regionName: 'eu-central-1'
+              imageSource: 'imagename'
+              sourceImageName: $(DockerImageName)
+              sourceImageTag: $(ServiceVersion)
+              repositoryName: $(DockerImageName)
+              pushTag: $(ServiceVersion)
+              autoCreateRepository: true
