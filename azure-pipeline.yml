@@ -25,7 +25,7 @@ parameters:
     default: true
   - name: DoRelease
     type: boolean
-    default: false
+    default: true
   - name: HelmDeploy
     type: boolean
     default: true
