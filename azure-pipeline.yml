@@ -5,6 +5,15 @@ parameters:
   - name: DockerImageName
     type: string
     default: 'fission-bundle'
+  - name: DockerBuildArguments
+    type: string
+    default: ''
+  - name: DockerBuildContext
+    type: string
+    default: '$(System.DefaultWorkingDirectory)/fission/dist/fission-bundle_linux_amd64_v1'
+  - name: DockerFilePath
+    type: string
+    default: '$(System.DefaultWorkingDirectory)/fission/dist/fission-bundle_linux_amd64_v1'
   - name: ProjectSrcFolder
     type: string
     default: ''
@@ -36,6 +45,8 @@ parameters:
 variables:
   - name: GO_VERSION
     value: "1.18"
+  - name: MAVEN_OS_CREDENTIALS_DOCKER_PARAMETERS
+    value: '--build-arg MAVEN_OS_USERNAME="OutSystemsRD" --build-arg MAVEN_OS_PASSWORD="$(System.AccessToken)"'
 
 resources:
   repositories:
@@ -119,6 +130,8 @@ stages:
           - template: setup/set-variables-go.yml@OutSystems.CICDPlatform.PhoenixServicePipelineTemplates
             parameters:
               DockerImageName: ${{ parameters.DockerImageName }}
+              DockerFilePath: ${{ parameters.DockerFilePath }}
+              DockerBuildContext: ${{ parameters.DockerBuildContext }}
               ProjectName: ${{ parameters.ProjectName }}
               ProjectSrcFolder: ${{ parameters.ProjectSrcFolder }}
               ProjectPath: ${{ parameters.ProjectPath }}
@@ -135,7 +148,19 @@ stages:
               sudo apt update && sudo apt install goreleaser
               echo "Running goreleaser build"
               GOOS=linux GOARCH=amd64 goreleaser build --snapshot --rm-dist --single-target
+              cp cmd/fission-bundle/Dockerfile.fission-bundle dist/fission-bundle_linux_amd64_v1/Dockerfile
             workingDirectory: $(ProjectPath)
+          # Build the docker image
+          - template: build/docker-build.yml@OutSystems.CICDPlatform.AzureCITemplates
+            parameters:
+              DockerfilePath: $(DockerFilePath)
+              BuildContext: $(DockerBuildContext)
+              BuildArguments: >
+                -t $(DockerImageName):$(ServiceVersion)
+                -t $(CoreACRUri)/$(DockerImageName):$(ServiceVersion)
+                -t $(DockerImageName):latest
+                ${{ parameters.DockerBuildArguments }}
+                $(MAVEN_OS_CREDENTIALS_DOCKER_PARAMETERS)
           ########################################################################################################################
           # PUSH TO ACR
           ########################################################################################################################
