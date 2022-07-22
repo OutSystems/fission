@@ -97,7 +97,6 @@ stages:
               WorkingDir: $(ProjectPath)
               GithubToken: $(GITHUB_TOKEN)
               GithubConnection: 'SDLC Phoenix Cloud'
-              Version: '0.0.1'
               DoRelease: ${{ parameters.DoRelease }}
 
       - job: Release
