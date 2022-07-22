@@ -120,13 +120,13 @@ stages:
           - ${{ each step in parameters.PreSetup }}:
               - ${{ each pair in step }}:
                   ${{ pair.key }}: ${{ pair.value }}
-#          - template: setup/phoenix-versioning.yml@OutSystems.CICDPlatform.AzureCITemplates
-#            parameters:
-#              ScriptsDir: $(TemplatePath)
-#              WorkingDir: $(ProjectPath)
-#              GithubToken: $(GITHUB_TOKEN)
-#              GithubConnection: 'SDLC Phoenix Cloud'
-#              DoRelease: ${{ parameters.DoRelease }}
+          - template: setup/phoenix-versioning.yml@OutSystems.CICDPlatform.AzureCITemplates
+            parameters:
+              ScriptsDir: $(TemplatePath)
+              WorkingDir: $(ProjectPath)
+              GithubToken: $(GITHUB_TOKEN)
+              GithubConnection: 'SDLC Phoenix Cloud'
+              DoRelease: ${{ parameters.DoRelease }}
 
       ########################################################################################################################
       # COMPILE AND BUILD DOCKER IMAGE
@@ -140,7 +140,7 @@ stages:
           vmImage: 'ubuntu-20.04'
         variables:
           ${{ if eq(parameters.RunSetupJob, true) }}:
-            ServiceVersion: 0.0.1
+            ServiceVersion: $[ dependencies.Setup.outputs['Version.ServiceVersion'] ]
           ${{ if ne(parameters.RunSetupJob, true) }}:
             ServiceVersion: $(Build.BuildId)
         steps:
