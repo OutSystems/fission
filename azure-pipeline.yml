@@ -142,6 +142,7 @@ stages:
             inputs:
               version: "$(GO_VERSION)"
             displayName: Install Go
+          # Compile fission
           - bash: |
               echo "Installing goreleaser"
               echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' | sudo tee /etc/apt/sources.list.d/goreleaser.list
@@ -150,6 +151,7 @@ stages:
               GOOS=linux GOARCH=amd64 goreleaser build --snapshot --rm-dist --single-target
               cp cmd/fission-bundle/Dockerfile.fission-bundle dist/fission-bundle_linux_amd64_v1/Dockerfile
             workingDirectory: $(ProjectPath)
+            displayName: 'Run goreleaser build'
           # Build the docker image
           - template: build/docker-build.yml@OutSystems.CICDPlatform.AzureCITemplates
             parameters:
