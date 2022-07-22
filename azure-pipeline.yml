@@ -14,6 +14,12 @@ parameters:
   - name: DockerFilePath
     type: string
     default: '$(System.DefaultWorkingDirectory)/fission/dist/fission-bundle_linux_amd64_v1'
+  - name: HelmChartName
+    type: string
+    default: 'fission-all'
+  - name: HelmChartECRRepository
+    type: string
+    default: '083779802266.dkr.ecr.eu-central-1.amazonaws.com/helm/'
   - name: ProjectSrcFolder
     type: string
     default: ''
@@ -23,6 +29,12 @@ parameters:
   - name: ContainerRegistry
     type: string
     default: 'SDLC EdenCore'
+  - name : AcrName
+    type: string
+    default: 'edencore'
+  - name: AzureSubscription
+    type: string
+    default: 'Azure SDLC'
   - name: IsGitLFS
     type: boolean
     default: false
@@ -39,6 +51,12 @@ parameters:
     type: boolean
     default: true
   - name: PreSetup
+    type: stepList
+    default: []
+  - name: PreDockerBuild
+    type: stepList
+    default: []
+  - name: PostDockerBuild
     type: stepList
     default: []
 
@@ -110,7 +128,10 @@ stages:
 #              GithubConnection: 'SDLC Phoenix Cloud'
 #              DoRelease: ${{ parameters.DoRelease }}
 
-      - job: Release
+      ########################################################################################################################
+      # COMPILE AND BUILD DOCKER IMAGE
+      ########################################################################################################################
+      - job: Build
         displayName: 'Build'
         dependsOn:
           - Setup
@@ -152,6 +173,10 @@ stages:
               cp cmd/fission-bundle/Dockerfile.fission-bundle dist/fission-bundle_linux_amd64_v1/Dockerfile
             workingDirectory: $(ProjectPath)
             displayName: 'Run goreleaser build'
+          # Pre Docker Build Step
+          - ${{ each step in parameters.PreDockerBuild }}:
+              - ${{ each pair in step }}:
+                  ${{ pair.key }}: ${{ pair.value }}
           # Build the docker image
           - template: build/docker-build.yml@OutSystems.CICDPlatform.AzureCITemplates
             parameters:
@@ -163,8 +188,13 @@ stages:
                 -t $(DockerImageName):latest
                 ${{ parameters.DockerBuildArguments }}
                 $(MAVEN_OS_CREDENTIALS_DOCKER_PARAMETERS)
+          # Post Docker Build Step
+          - ${{ each step in parameters.PostDockerBuild }}:
+              - ${{ each pair in step }}:
+                  ${{ pair.key }}: ${{ pair.value }}
+
           ########################################################################################################################
-          # PUSH TO ACR
+          # PUSH TO ACR AND ECR
           ########################################################################################################################
           # Push to Core ACR on pass or fail
           - template: publish/docker-push.yml@OutSystems.CICDPlatform.AzureCITemplates
@@ -186,3 +216,49 @@ stages:
               repositoryName: $(DockerImageName)
               pushTag: $(ServiceVersion)
               autoCreateRepository: true
+          - task: ECRPushImage@1
+            displayName: 'Publish Docker image to ECR (latest tag)'
+            condition: and(succeeded(), eq('${{ parameters.HelmDeploy }}', 'true'))
+            inputs:
+              awsCredentials: 'sdlc_datafabric_core'
+              regionName: 'eu-central-1'
+              imageSource: 'imagename'
+              sourceImageName: $(DockerImageName)
+              sourceImageTag: $(ServiceVersion)
+              repositoryName: $(DockerImageName)
+              pushTag: latest
+              autoCreateRepository: true
+          # Package and push Helm Chart
+          - task: HelmInstaller@1
+            displayName: Helm installer
+            inputs:
+              helmVersionToInstall: 3.8.1
+          - bash: |
+              helm package . --version $(ServiceVersion)
+            workingDirectory: $(ProjectPath)/charts/fission-all
+            env:
+              HELM_EXPERIMENTAL_OCI: 1
+          - task: AzureCLI@2
+            displayName: 'Push Helm Chart to ACR'
+            condition: and(succeeded(), eq('${{ parameters.DoRelease }}', 'true'))
+            env:
+              HELM_EXPERIMENTAL_OCI: 1
+            inputs:
+              azureSubscription: '${{ parameters.AzureSubscription }}'
+              scriptType: 'bash'
+              workingDirectory: $(ProjectPath)/charts/fission-all
+              addSpnToEnvironment: true
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo $servicePrincipalKey | helm registry login ${{parameters.AcrName}}.azurecr.io -u $servicePrincipalId --password-stdin
+                helm push ${{ parameters.HelmChartName }}-$(ServiceVersion).tgz oci://${{parameters.AcrName}}.azurecr.io/helm/
+          - bash: |
+              aws ecr get-login-password --region eu-central-1 | helm registry login --username AWS --password-stdin ${{ parameters.HelmChartECRRepository }}
+              helm push ${{ parameters.HelmChartName }}-$(ServiceVersion).tgz oci://${{ parameters.HelmChartECRRepository }}
+            displayName: 'Push Helm Chart to ECR'
+            condition: and(succeeded(), eq('${{ parameters.HelmDeploy }}', 'true'))
+            workingDirectory: $(ProjectPath)/charts/fission-all
+            env:
+              HELM_EXPERIMENTAL_OCI: 1
+              AWS_ACCESS_KEY_ID: $(DatafabricAWSKey)
+              AWS_SECRET_ACCESS_KEY: $(DatafabricAWSSecretKey)
