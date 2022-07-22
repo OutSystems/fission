@@ -131,7 +131,8 @@ stages:
             displayName: Install Go
           - bash: |
               echo "Installing goreleaser"
-              sudo apt install goreleaser
+              echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' | sudo tee /etc/apt/sources.list.d/goreleaser.list
+              sudo apt update && sudo apt install goreleaser
               echo "Running goreleaser build"
               GOOS=linux GOARCH=amd64 goreleaser build --snapshot --rm-dist --single-target
 #          - task: goreleaser@0
