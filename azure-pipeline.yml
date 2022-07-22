@@ -136,12 +136,6 @@ stages:
               echo "Running goreleaser build"
               GOOS=linux GOARCH=amd64 goreleaser build --snapshot --rm-dist --single-target
             workingDirectory: $(ProjectPath)
-#          - task: goreleaser@0
-#            inputs:
-#              version: 'latest'
-#              distribution: 'goreleaser'
-#              args: ''
-#              workdir: $(ProjectPath)
           ########################################################################################################################
           # PUSH TO ACR
           ########################################################################################################################
