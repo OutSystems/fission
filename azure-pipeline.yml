@@ -135,6 +135,7 @@ stages:
               sudo apt update && sudo apt install goreleaser
               echo "Running goreleaser build"
               GOOS=linux GOARCH=amd64 goreleaser build --snapshot --rm-dist --single-target
+            workingDirectory: $(ProjectPath)
 #          - task: goreleaser@0
 #            inputs:
 #              version: 'latest'
