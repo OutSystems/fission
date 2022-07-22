@@ -91,14 +91,13 @@ stages:
           - ${{ each step in parameters.PreSetup }}:
               - ${{ each pair in step }}:
                   ${{ pair.key }}: ${{ pair.value }}
-          - template: setup/phoenix-versioning.yml@OutSystems.CICDPlatform.AzureCITemplates
-            parameters:
-              ScriptsDir: $(TemplatePath)
-              WorkingDir: $(ProjectPath)
-              GithubToken: $(GITHUB_TOKEN)
-              GithubConnection: 'SDLC Phoenix Cloud'
-              Version: '0.0.1'
-              DoRelease: ${{ parameters.DoRelease }}
+#          - template: setup/phoenix-versioning.yml@OutSystems.CICDPlatform.AzureCITemplates
+#            parameters:
+#              ScriptsDir: $(TemplatePath)
+#              WorkingDir: $(ProjectPath)
+#              GithubToken: $(GITHUB_TOKEN)
+#              GithubConnection: 'SDLC Phoenix Cloud'
+#              DoRelease: ${{ parameters.DoRelease }}
 
       - job: Release
         displayName: 'Build'
@@ -109,7 +108,7 @@ stages:
           vmImage: 'ubuntu-20.04'
         variables:
           ${{ if eq(parameters.RunSetupJob, true) }}:
-            ServiceVersion: $[ dependencies.Setup.outputs['Version.ServiceVersion'] ]
+            ServiceVersion: 0.0.1
           ${{ if ne(parameters.RunSetupJob, true) }}:
             ServiceVersion: $(Build.BuildId)
         steps:
