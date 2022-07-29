@@ -52,7 +52,7 @@ parameters:
     default: true
   - name: ReleaseVersion
     type: string
-    default: 'v1.17.0-rc1+0.0.1_test'
+    default: 'v1.17.0-rc1+0.0.1'
   - name: HelmDeploy
     type: boolean
     default: true
