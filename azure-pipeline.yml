@@ -295,3 +295,4 @@ stages:
                 tagSource: 'manual'
                 tag: $(ServiceVersion)
                 addChangeLog: true
+                
