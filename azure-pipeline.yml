@@ -269,6 +269,10 @@ stages:
               HELM_EXPERIMENTAL_OCI: 1
               AWS_ACCESS_KEY_ID: $(DatafabricAWSKey)
               AWS_SECRET_ACCESS_KEY: $(DatafabricAWSSecretKey)
+
+      ########################################################################################################################
+      # CREATE A NEW GIT RELEASE
+      ########################################################################################################################
       - job: Release
         displayName: 'Git Release'
         dependsOn:
