@@ -26,6 +26,9 @@ parameters:
   - name: ProjectPath
     type: string
     default: ''
+  - name: GithubConnection
+    type: string
+    default: 'SDLC Phoenix Cloud'
   - name: ContainerRegistry
     type: string
     default: 'SDLC EdenCore'
@@ -49,7 +52,7 @@ parameters:
     default: true
   - name: ReleaseVersion
     type: string
-    default: 'v1.17.0-rc1+0.0.1'
+    default: 'v1.17.0-rc1+0.0.1_test'
   - name: HelmDeploy
     type: boolean
     default: true
@@ -128,8 +131,8 @@ stages:
               ScriptsDir: $(TemplatePath)
               WorkingDir: $(ProjectPath)
               GithubToken: $(GITHUB_TOKEN)
-              GithubConnection: 'SDLC Phoenix Cloud'
-              DoRelease: ${{ parameters.DoRelease }}
+              GithubConnection: ${{parameters.GithubConnection}}
+              DoRelease: false
               Version: ${{ parameters.ReleaseVersion }}
 
       ########################################################################################################################
@@ -266,3 +269,27 @@ stages:
               HELM_EXPERIMENTAL_OCI: 1
               AWS_ACCESS_KEY_ID: $(DatafabricAWSKey)
               AWS_SECRET_ACCESS_KEY: $(DatafabricAWSSecretKey)
+      - job: Release
+        displayName: 'Git Release'
+        dependsOn:
+          - Setup
+          - Build
+        condition: eq(dependencies.Build.result, 'Succeeded')
+        pool:
+          vmImage: 'ubuntu-20.04'
+        variables:
+          ${{ if eq(parameters.RunSetupJob, true) }}:
+            ServiceVersion: $[ dependencies.Setup.outputs['Version.ServiceVersion'] ]
+          ${{ if ne(parameters.RunSetupJob, true) }}:
+            ServiceVersion: $(Build.BuildId)
+        steps:
+          - ${{ if eq(parameters.DoRelease, true) }}:
+            - task: GitHubRelease@0
+              inputs:
+                gitHubConnection: ${{parameters.GithubConnection}}
+                repositoryName: '$(Build.Repository.Name)'
+                action: 'create'
+                target: '$(Build.SourceVersion)'
+                tagSource: 'manual'
+                tag: $(ServiceVersion)
+                addChangeLog: true
