@@ -47,6 +47,9 @@ parameters:
   - name: DoRelease
     type: boolean
     default: true
+  - name: ReleaseVersion
+    type: string
+    default: 'v1.17.0-rc1+0.0.1'
   - name: HelmDeploy
     type: boolean
     default: true
@@ -127,6 +130,7 @@ stages:
               GithubToken: $(GITHUB_TOKEN)
               GithubConnection: 'SDLC Phoenix Cloud'
               DoRelease: ${{ parameters.DoRelease }}
+              Version: ${{ parameters.ReleaseVersion }}
 
       ########################################################################################################################
       # COMPILE AND BUILD DOCKER IMAGE
