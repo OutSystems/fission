@@ -205,6 +205,34 @@ func Start(ctx context.Context, logger *zap.Logger, port int, executorURL string
 			zap.Bool("default", displayAccessLog))
 	}
 
+	stickinessEnableStr := os.Getenv("ROUTER_STICKINESS_ENABLE")
+	stickinessEnable, err := strconv.ParseBool(stickinessEnableStr)
+	if err != nil {
+		stickinessEnable = false
+		logger.Error("failed to parse router stickiness feature toggle from 'ROUTER_STICKINESS_ENABLE' - set to the default value",
+			zap.Error(err),
+			zap.String("value", stickinessEnableStr),
+			zap.Bool("default", stickinessEnable))
+	}
+
+	stickinessCookieName := os.Getenv("ROUTER_STICKINESS_COOKIE_NAME")
+	if len(stickinessCookieName) <= 0 {
+		stickinessCookieName = "fission_serviceaddress"
+		logger.Error("failed to parse router stickiness cookie name from 'ROUTER_STICKINESS_COOKIE_NAME' - set to the default value",
+			zap.Error(err),
+			zap.String("value", ""),
+			zap.String("default", stickinessCookieName))
+	}
+
+	stickinessSvcAddressHeader := os.Getenv("ROUTER_STICKINESS_SVC_ADDRESS_HEADER")
+	if len(stickinessSvcAddressHeader) <= 0 {
+		stickinessSvcAddressHeader = "X-Fission-Service-Address"
+		logger.Error("failed to parse router service address header from 'ROUTER_STICKINESS_SVC_ADDRESS_HEADER' - set to the default value",
+			zap.Error(err),
+			zap.String("value", ""),
+			zap.String("default", stickinessSvcAddressHeader))
+	}
+
 	triggers := makeHTTPTriggerSet(logger.Named("triggerset"), fmap, fissionClient, kubeClient, executor, &tsRoundTripperParams{
 		timeout:           timeout,
 		timeoutExponent:   timeoutExponent,

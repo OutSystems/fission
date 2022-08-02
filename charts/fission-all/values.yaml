@@ -240,7 +240,7 @@ router:
     ##
     maxRetries: 10
 
-  stickyCookie:
+  stickiness:
     ## If true, router will check incoming requests for a sticky cookie, requests containing a
     ## sticky cookie with a valid service address will be routed to the specified function pod.
     ## Additionally, a service address header is added to all requests so that the function can
