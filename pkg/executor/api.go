@@ -249,6 +249,10 @@ func (executor *Executor) unTapService(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func (executor *Executor) isValidHandler(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+}
+
 // GetHandler returns an http.Handler.
 func (executor *Executor) GetHandler() http.Handler {
 	r := mux.NewRouter()
@@ -258,6 +262,7 @@ func (executor *Executor) GetHandler() http.Handler {
 	r.HandleFunc("/v2/tapServices", executor.tapServices).Methods("POST")
 	r.HandleFunc("/healthz", executor.healthHandler).Methods("GET")
 	r.HandleFunc("/v2/unTapService", executor.unTapService).Methods("POST")
+	r.HandleFunc("/v2/isValid", executor.isValidHandler).Methods("GET")
 	return r
 }
 
