@@ -55,13 +55,16 @@ type HTTPTriggerSet struct {
 	funcInformer               k8sCache.SharedIndexInformer
 	updateRouterRequestChannel chan struct{}
 	tsRoundTripperParams       *tsRoundTripperParams
+	stickinessParams           *stickinessParams
 	isDebugEnv                 bool
 	svcAddrUpdateThrottler     *throttler.Throttler
 	unTapServiceTimeout        time.Duration
 }
 
 func makeHTTPTriggerSet(logger *zap.Logger, fmap *functionServiceMap, fissionClient versioned.Interface,
-	kubeClient kubernetes.Interface, executor *executorClient.Client, params *tsRoundTripperParams, isDebugEnv bool, unTapServiceTimeout time.Duration, actionThrottler *throttler.Throttler) *HTTPTriggerSet {
+	kubeClient kubernetes.Interface, executor *executorClient.Client, params *tsRoundTripperParams,
+	stickiness *stickinessParams, isDebugEnv bool, unTapServiceTimeout time.Duration,
+	actionThrottler *throttler.Throttler) *HTTPTriggerSet {
 
 	httpTriggerSet := &HTTPTriggerSet{
 		logger:                     logger.Named("http_trigger_set"),
@@ -72,6 +75,7 @@ func makeHTTPTriggerSet(logger *zap.Logger, fmap *functionServiceMap, fissionCli
 		executor:                   executor,
 		updateRouterRequestChannel: make(chan struct{}, 10), // use buffer channel
 		tsRoundTripperParams:       params,
+		stickinessParams:           stickiness,
 		isDebugEnv:                 isDebugEnv,
 		svcAddrUpdateThrottler:     actionThrottler,
 		unTapServiceTimeout:        unTapServiceTimeout,
@@ -150,6 +154,7 @@ func (ts *HTTPTriggerSet) getRouter(fnTimeoutMap map[types.UID]int) *mux.Router 
 			functionMap:              rr.functionMap,
 			fnWeightDistributionList: rr.functionWtDistributionList,
 			tsRoundTripperParams:     ts.tsRoundTripperParams,
+			stickinessParams:         ts.stickinessParams,
 			isDebugEnv:               ts.isDebugEnv,
 			svcAddrUpdateThrottler:   ts.svcAddrUpdateThrottler,
 			functionTimeoutMap:       fnTimeoutMap,
@@ -246,6 +251,7 @@ func (ts *HTTPTriggerSet) getRouter(fnTimeoutMap map[types.UID]int) *mux.Router 
 			function:               &fn,
 			executor:               ts.executor,
 			tsRoundTripperParams:   ts.tsRoundTripperParams,
+			stickinessParams:       ts.stickinessParams,
 			isDebugEnv:             ts.isDebugEnv,
 			svcAddrUpdateThrottler: ts.svcAddrUpdateThrottler,
 			functionTimeoutMap:     fnTimeoutMap,

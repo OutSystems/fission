@@ -215,32 +215,19 @@ func Start(ctx context.Context, logger *zap.Logger, port int, executorURL string
 			zap.Bool("default", stickinessEnable))
 	}
 
-	stickinessCookieName := os.Getenv("ROUTER_STICKINESS_COOKIE_NAME")
-	if len(stickinessCookieName) <= 0 {
-		stickinessCookieName = "fission_serviceaddress"
-		logger.Error("failed to parse router stickiness cookie name from 'ROUTER_STICKINESS_COOKIE_NAME' - set to the default value",
-			zap.Error(err),
-			zap.String("value", ""),
-			zap.String("default", stickinessCookieName))
-	}
-
-	stickinessSvcAddressHeader := os.Getenv("ROUTER_STICKINESS_SVC_ADDRESS_HEADER")
-	if len(stickinessSvcAddressHeader) <= 0 {
-		stickinessSvcAddressHeader = "X-Fission-Service-Address"
-		logger.Error("failed to parse router service address header from 'ROUTER_STICKINESS_SVC_ADDRESS_HEADER' - set to the default value",
-			zap.Error(err),
-			zap.String("value", ""),
-			zap.String("default", stickinessSvcAddressHeader))
-	}
-
-	triggers := makeHTTPTriggerSet(logger.Named("triggerset"), fmap, fissionClient, kubeClient, executor, &tsRoundTripperParams{
-		timeout:           timeout,
-		timeoutExponent:   timeoutExponent,
-		disableKeepAlive:  disableKeepAlive,
-		keepAliveTime:     keepAliveTime,
-		maxRetries:        maxRetries,
-		svcAddrRetryCount: svcAddrRetryCount,
-	}, isDebugEnv, unTapServiceTimeout, throttler.MakeThrottler(svcAddrUpdateTimeout))
+	triggers := makeHTTPTriggerSet(logger.Named("triggerset"), fmap, fissionClient, kubeClient, executor,
+		&tsRoundTripperParams{
+			timeout:           timeout,
+			timeoutExponent:   timeoutExponent,
+			disableKeepAlive:  disableKeepAlive,
+			keepAliveTime:     keepAliveTime,
+			maxRetries:        maxRetries,
+			svcAddrRetryCount: svcAddrRetryCount,
+		},
+		&stickinessParams{
+			enabled: stickinessEnable,
+		},
+		isDebugEnv, unTapServiceTimeout, throttler.MakeThrottler(svcAddrUpdateTimeout))
 
 	go metrics.ServeMetrics(ctx, logger)
 

@@ -19,6 +19,7 @@ package router
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand"
@@ -50,6 +51,9 @@ const (
 
 	// X_FORWARDED_HOST represents the 'X_FORWARDED_HOST' request header
 	X_FORWARDED_HOST = "X-Forwarded-Host"
+
+	// STICKINESS_COOKIE represents the stickiness cookie name
+	STICKINESS_COOKIE = "fission_sticky"
 )
 
 type (
@@ -61,11 +65,21 @@ type (
 		httpTrigger              *fv1.HTTPTrigger
 		functionMap              map[string]*fv1.Function
 		fnWeightDistributionList []functionWeightDistribution
+		stickinessParams         *stickinessParams
 		tsRoundTripperParams     *tsRoundTripperParams
 		isDebugEnv               bool
 		svcAddrUpdateThrottler   *throttler.Throttler
 		functionTimeoutMap       map[k8stypes.UID]int
 		unTapServiceTimeout      time.Duration
+	}
+
+	stickinessCookie struct {
+		SvcAddress url.URL `json:"svcAddress"`
+		FuncName   string  `json:"funcName"`
+	}
+
+	stickinessParams struct {
+		enabled bool
 	}
 
 	tsRoundTripperParams struct {
@@ -93,6 +107,7 @@ type (
 		logger           *zap.Logger
 		funcHandler      *functionHandler
 		funcTimeout      time.Duration
+		stickyCookie     *stickinessCookie
 		closeContextFunc *context.CancelFunc
 		serviceURL       *url.URL
 		urlFromCache     bool
@@ -441,7 +456,26 @@ func (fh *functionHandler) tapService(fn *fv1.Function, serviceURL *url.URL) {
 }
 
 func (fh functionHandler) handler(responseWriter http.ResponseWriter, request *http.Request) {
-	if fh.httpTrigger != nil && fh.httpTrigger.Spec.FunctionReference.Type == fv1.FunctionReferenceTypeFunctionWeights {
+
+	var stickyCookie *stickinessCookie = nil
+	if fh.stickinessParams.enabled {
+		cookie, err := request.Cookie(STICKINESS_COOKIE)
+		if err == nil {
+			err = json.Unmarshal([]byte(cookie.Value), stickyCookie)
+			if err == nil {
+				fn := fh.functionMap[stickyCookie.FuncName]
+				if fn == nil {
+					// The sticky function no longer exists so the request cannot be handled
+					// TODO : write error to responseWrite and return response
+					return
+				}
+				fh.function = fn
+				fh.logger.Debug("sticky function metadata", zap.Any("metadata", fh.function))
+			}
+		}
+	}
+
+	if stickyCookie == nil && fh.httpTrigger != nil && fh.httpTrigger.Spec.FunctionReference.Type == fv1.FunctionReferenceTypeFunctionWeights {
 		// canary deployment. need to determine the function to send request to now
 		fn := getCanaryBackend(fh.functionMap, fh.fnWeightDistributionList)
 		if fn == nil {
@@ -474,9 +508,10 @@ func (fh functionHandler) handler(responseWriter http.ResponseWriter, request *h
 	}
 
 	rrt := &RetryingRoundTripper{
-		logger:      fh.logger.Named("roundtripper"),
-		funcHandler: &fh,
-		funcTimeout: time.Duration(fnTimeout) * time.Second,
+		logger:       fh.logger.Named("roundtripper"),
+		funcHandler:  &fh,
+		funcTimeout:  time.Duration(fnTimeout) * time.Second,
+		stickyCookie: stickyCookie,
 	}
 
 	start := time.Now()
