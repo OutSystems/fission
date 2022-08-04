@@ -250,7 +250,82 @@ func (executor *Executor) unTapService(w http.ResponseWriter, r *http.Request) {
 }
 
 func (executor *Executor) isValidHandler(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
+	ctx := r.Context()
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Failed to read request", http.StatusInternalServerError)
+		return
+	}
+
+	// get function metadata
+	fn := &fv1.Function{}
+	err = json.Unmarshal(body, &fn)
+	if err != nil {
+		http.Error(w, "Failed to parse request", http.StatusBadRequest)
+		return
+	}
+
+	t := fn.Spec.InvokeStrategy.ExecutionStrategy.ExecutorType
+	et := executor.executorTypes[t]
+	logger := otelUtils.LoggerWithTraceID(ctx, executor.logger)
+
+	// Check function -> svc cache
+	logger.Debug("checking for cached function service",
+		zap.String("function_name", fn.ObjectMeta.Name),
+		zap.String("function_namespace", fn.ObjectMeta.Namespace))
+	if t == fv1.ExecutorTypePoolmgr && !fn.Spec.OnceOnly {
+		concurrency := fn.Spec.Concurrency
+		if concurrency == 0 {
+			concurrency = 500
+		}
+		requestsPerpod := fn.Spec.RequestsPerPod
+		if requestsPerpod == 0 {
+			requestsPerpod = 1
+		}
+		fsvc, active, err := et.GetFuncSvcFromPoolCache(ctx, fn, requestsPerpod)
+		// check if its a cache hit (check if there is already specialized function pod that can serve another request)
+		if err == nil {
+			// if a pod is already serving request then it already exists else validated
+			logger.Debug("from cache", zap.Int("active", active))
+			if et.IsValid(ctx, fsvc) {
+				// return true
+				logger.Debug("served from cache", zap.String("name", fsvc.Name), zap.String("address", fsvc.Address))
+				executor.writeResponse(w, true, fn.ObjectMeta.Name)
+				return
+			}
+			logger.Debug("deleting cache entry for invalid address",
+				zap.String("function_name", fn.ObjectMeta.Name),
+				zap.String("function_namespace", fn.ObjectMeta.Namespace),
+				zap.String("address", fsvc.Address))
+			et.DeleteFuncSvcFromCache(ctx, fsvc)
+			active--
+		}
+
+		if active >= concurrency {
+			errMsg := fmt.Sprintf("max concurrency reached for %v. All %v instance are active", fn.ObjectMeta.Name, concurrency)
+			logger.Error("error occurred", zap.String("error", errMsg))
+			http.Error(w, html.EscapeString(errMsg), http.StatusTooManyRequests)
+			return
+		}
+	} else if t == fv1.ExecutorTypeNewdeploy || t == fv1.ExecutorTypeContainer {
+		fsvc, err := et.GetFuncSvcFromCache(ctx, fn)
+		if err == nil {
+			if et.IsValid(ctx, fsvc) {
+				// return true
+				executor.writeResponse(w, true, fn.ObjectMeta.Name)
+				return
+			}
+			logger.Debug("deleting cache entry for invalid address",
+				zap.String("function_name", fn.ObjectMeta.Name),
+				zap.String("function_namespace", fn.ObjectMeta.Namespace),
+				zap.String("address", fsvc.Address))
+			et.DeleteFuncSvcFromCache(ctx, fsvc)
+		}
+	}
+
+	//if we reach here, it means that the function is not valid
+	executor.writeResponse(w, false, fn.ObjectMeta.Name)
+	return
 }
 
 // GetHandler returns an http.Handler.
