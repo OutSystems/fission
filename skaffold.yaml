@@ -40,6 +40,7 @@ deploy:
         debugEnv: false
         fetcher.imageTag: ""
         imageTag: ""
+        fission_bundle.imageTag: ""
         preUpgradeChecks.imageTag: ""
         namespace: fission
         pprof.enabled: false
@@ -50,6 +51,7 @@ deploy:
         runtimePodSpec.enabled: false
         builderPodSpec.enabled: false
         repository: index.docker.io
+        fission_bundle.repository: index.docker.io
         routerServiceType: LoadBalancer
         openTelemetry.otlpCollectorEndpoint: ""
         openTelemetry.otlpInsecure: true
@@ -82,8 +84,17 @@ profiles:
     path: /deploy/helm/releases/0/setValues/repository
     value: ""
   - op: replace
+    path: /deploy/helm/releases/0/setValues/fission_bundle.repository
+    value: ""
+  - op: replace
+    path: /deploy/helm/releases/0/setValues/canaryDeployment.enabled
+    value: true
+  - op: replace
     path: /deploy/helm/releases/0/setValues/routerServiceType
     value: NodePort
+  - op: replace
+    path: /deploy/helm/releases/0/setValues/prometheus.serviceEndpoint
+    value: "http://prometheus-kube-prometheus-prometheus.prometheus.svc.cluster.local:9090"
 - name: kind-debug
   patches:
   - op: replace

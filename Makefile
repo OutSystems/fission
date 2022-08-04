@@ -42,9 +42,7 @@ debug-vars: print-GOOS print-GOARCH print-GOAMD64 print-VERSION print-TIMESTAMP 
 check: test-run build-fission-cli clean
 
 code-checks:
-	hack/verify-gofmt.sh
-	hack/verify-govet.sh
-	hack/verify-staticcheck.sh
+	golangci-lint run --out-format=json --timeout=5m
 
 # run basic check scripts
 test-run: code-checks
@@ -109,8 +107,14 @@ skaffold-prebuild:
 	@cp -v cmd/reporter/Dockerfile.reporter dist/reporter_linux_amd64_v1/Dockerfile
 	@cp -v cmd/preupgradechecks/Dockerfile.fission-preupgradechecks dist/pre-upgrade-checks_linux_amd64_v1/Dockerfile
 
-skaffold-deploy: skaffold-prebuild
+skaffold-deploy: skaffold-prebuild skaffold-clean
+	kubectl create namespace fission || true
 	skaffold run -p $(SKAFFOLD_PROFILE)
+
+skaffold-clean:
+	@echo "🔥 Delete fission release"
+	skaffold delete 2>/dev/null || true
+	kubectl delete namespace fission 2>/dev/null || true
 
 ### Release
 release:
