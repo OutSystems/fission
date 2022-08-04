@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - main-os
     paths:
       - '**.go'
       - go.mod
