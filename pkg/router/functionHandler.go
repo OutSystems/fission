@@ -54,6 +54,12 @@ const (
 
 	// STICKINESS_COOKIE represents the stickiness cookie name
 	STICKINESS_COOKIE = "fission_sticky"
+
+	// LENIENT represents the lenient stickiness cookie type
+	LENIENT stickinessType = "lenient"
+
+	// STRICT represents the strict stickiness cookie type
+	STRICT stickinessType = "strict"
 )
 
 type (
@@ -73,9 +79,12 @@ type (
 		unTapServiceTimeout      time.Duration
 	}
 
+	stickinessType string
+
 	stickinessCookie struct {
-		SvcAddress url.URL `json:"svcAddress"`
-		FuncName   string  `json:"funcName"`
+		SvcAddress url.URL        `json:"svcAddress"`
+		FuncName   string         `json:"funcName"`
+		Type       stickinessType `json:"type"`
 	}
 
 	stickinessParams struct {
