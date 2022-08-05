@@ -50,7 +50,7 @@ func (executor *Executor) getServiceForFunctionAPI(w http.ResponseWriter, r *htt
 	fn := &fv1.Function{}
 	err = json.Unmarshal(body, &fn)
 	if err != nil {
-		http.Error(w, "Failed to parse request", http.StatusBadRequest)
+		http.Error(w, "Failed to request", http.StatusBadRequest)
 		return
 	}
 
@@ -125,8 +125,8 @@ func (executor *Executor) getServiceForFunctionAPI(w http.ResponseWriter, r *htt
 	executor.writeResponse(w, serviceName, fn.ObjectMeta.Name)
 }
 
-func (executor *Executor) writeResponse(w http.ResponseWriter, serviceName string, fnName string) {
-	_, err := w.Write([]byte(serviceName))
+func (executor *Executor) writeResponse(w http.ResponseWriter, response string, fnName string) {
+	_, err := w.Write([]byte(response))
 	if err != nil {
 		executor.logger.Error(
 			"error writing HTTP response",
@@ -249,6 +249,8 @@ func (executor *Executor) unTapService(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// isValidHandler is very similar to getServiceForFunctionAPI, with the difference that the response returned doens't contain
+// the address, but instead returns "true" or "false", depending if the function service is valid or not.
 func (executor *Executor) isValidHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	body, err := io.ReadAll(r.Body)
@@ -270,7 +272,7 @@ func (executor *Executor) isValidHandler(w http.ResponseWriter, r *http.Request)
 	logger := otelUtils.LoggerWithTraceID(ctx, executor.logger)
 
 	// Check function -> svc cache
-	logger.Debug("checking for cached function service",
+	logger.Info("checking for cached function service",
 		zap.String("function_name", fn.ObjectMeta.Name),
 		zap.String("function_namespace", fn.ObjectMeta.Namespace))
 	if t == fv1.ExecutorTypePoolmgr && !fn.Spec.OnceOnly {
@@ -290,7 +292,7 @@ func (executor *Executor) isValidHandler(w http.ResponseWriter, r *http.Request)
 			if et.IsValid(ctx, fsvc) {
 				// return true
 				logger.Debug("served from cache", zap.String("name", fsvc.Name), zap.String("address", fsvc.Address))
-				executor.writeResponse(w, true, fn.ObjectMeta.Name)
+				executor.writeResponse(w, "true", fn.ObjectMeta.Name)
 				return
 			}
 			logger.Debug("deleting cache entry for invalid address",
@@ -312,7 +314,7 @@ func (executor *Executor) isValidHandler(w http.ResponseWriter, r *http.Request)
 		if err == nil {
 			if et.IsValid(ctx, fsvc) {
 				// return true
-				executor.writeResponse(w, true, fn.ObjectMeta.Name)
+				executor.writeResponse(w, "true", fn.ObjectMeta.Name)
 				return
 			}
 			logger.Debug("deleting cache entry for invalid address",
@@ -324,7 +326,7 @@ func (executor *Executor) isValidHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	//if we reach here, it means that the function is not valid
-	executor.writeResponse(w, false, fn.ObjectMeta.Name)
+	executor.writeResponse(w, "false", fn.ObjectMeta.Name)
 	return
 }
 
@@ -337,13 +339,14 @@ func (executor *Executor) GetHandler() http.Handler {
 	r.HandleFunc("/v2/tapServices", executor.tapServices).Methods("POST")
 	r.HandleFunc("/healthz", executor.healthHandler).Methods("GET")
 	r.HandleFunc("/v2/unTapService", executor.unTapService).Methods("POST")
-	r.HandleFunc("/v2/isValid", executor.isValidHandler).Methods("GET")
+	r.HandleFunc("/v2/isValid", executor.isValidHandler).Methods("POST")
 	return r
 }
 
 // Serve starts an HTTP server.
 func (executor *Executor) Serve(ctx context.Context, port int) {
+	executor.logger.Info("Started HTTP Server for api")
+
 	handler := otelUtils.GetHandlerWithOTEL(executor.GetHandler(), "fission-executor", otelUtils.UrlsToIgnore("/healthz"))
 	httpserver.StartServer(ctx, executor.logger, "executor", fmt.Sprintf("%d", port), handler)
-
 }
