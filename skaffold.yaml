@@ -31,7 +31,7 @@ deploy:
       - ./charts/fission-all/values.yaml
       artifactOverrides:
         fetcher.image: fetcher
-        image: fission-bundle
+        fission_bundle.image: fission-bundle
         postInstallReportImage: reporter
         preUpgradeChecks.image: pre-upgrade-checks
       namespace: fission
