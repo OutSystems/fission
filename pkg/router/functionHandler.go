@@ -482,12 +482,12 @@ func parseStickinessCookie(request *http.Request) (*stickinessCookie, *http.Cook
 	return stickinessCookie, cookie, err
 }
 
-func (fh functionHandler) invalidateStrictStickinessCookie(responseWriter http.ResponseWriter, cookie *http.Cookie) {
+func (fh functionHandler) invalidateStrictStickinessCookie(responseWriter http.ResponseWriter, cookie *http.Cookie) (int, error) {
 	fh.logger.Debug("invalid stickiness cookie (strict type)", zap.Any("cookie", cookie))
 	cookie.MaxAge = -1
 	responseWriter.Header().Add("Set-Cookie", cookie.String())
 	responseWriter.WriteHeader(http.StatusInternalServerError)
-	responseWriter.Write([]byte("Invalid stickiness cookie (strict type)"))
+	return responseWriter.Write([]byte("Invalid stickiness cookie (strict type)"))
 }
 
 func (fh functionHandler) handler(responseWriter http.ResponseWriter, request *http.Request) {
@@ -505,7 +505,10 @@ func (fh functionHandler) handler(responseWriter http.ResponseWriter, request *h
 				fh.logger.Debug("chosen function backend's metadata (stickiness cookie)", zap.Any("metadata", fh.function))
 			} else if stickinessCookie.Type == STRICT {
 				// the cookie is strict and invalid so this request cannot be handled
-				fh.invalidateStrictStickinessCookie(responseWriter, cookie)
+				_, err = fh.invalidateStrictStickinessCookie(responseWriter, cookie)
+				if err != nil {
+					fh.logger.Error("error writing invalid stickiness cookie response", zap.Error(err))
+				}
 				return
 			}
 		}
