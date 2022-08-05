@@ -24,6 +24,9 @@ GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
 GOAMD64 ?= $(shell go env GOAMD64)
 
+FISSION_HOST_PORT=6543
+FISSION_GUEST_PORT=80
+
 FISSION-CLI-SUFFIX :=
 ifeq ($(GOOS), windows)
 	FISSION-CLI-SUFFIX := .exe
@@ -110,6 +113,13 @@ skaffold-prebuild:
 skaffold-deploy: skaffold-prebuild skaffold-clean
 	kubectl create namespace fission || true
 	skaffold run -p $(SKAFFOLD_PROFILE)
+	ps -ef | grep -v grep | grep -E "kubectl port-forward svc/router" | awk '{print $$2}' | xargs -r kill -9;
+	kubectl port-forward svc/router $(FISSION_HOST_PORT):$(FISSION_GUEST_PORT) --namespace fission > /dev/null 2>&1 &
+
+skaffold-clean:
+	@echo "🔥 Delete fission release"
+	skaffold delete 2>/dev/null || true
+	kubectl delete namespace fission 2>/dev/null || true
 
 skaffold-clean:
 	@echo "🔥 Delete fission release"
