@@ -116,7 +116,7 @@ type (
 		logger           *zap.Logger
 		funcHandler      *functionHandler
 		funcTimeout      time.Duration
-		stickyCookie     *stickinessCookie
+		stickinessCookie *stickinessCookie
 		closeContextFunc *context.CancelFunc
 		serviceURL       *url.URL
 		urlFromCache     bool
@@ -247,8 +247,16 @@ func (roundTripper *RetryingRoundTripper) RoundTrip(req *http.Request) (*http.Re
 			otelUtils.SpanTrackEvent(ctx, "getServiceEntry", otelUtils.MapToAttributes(map[string]string{
 				"function-name":      fnMeta.Name,
 				"function-namespace": fnMeta.Namespace})...)
-			// get function service url from cache or executor
-			roundTripper.serviceURL, roundTripper.urlFromCache, err = roundTripper.funcHandler.getServiceEntry(ctx)
+
+			if roundTripper.stickinessCookie != nil {
+				// get function service url from stickiness cookie
+				roundTripper.serviceURL = &roundTripper.stickinessCookie.SvcAddress
+				roundTripper.urlFromCache = false
+			} else {
+				// get function service url from cache or executor
+				roundTripper.serviceURL, roundTripper.urlFromCache, err = roundTripper.funcHandler.getServiceEntry(ctx)
+			}
+
 			if err != nil {
 				// We might want a specific error code or header for fission failures as opposed to
 				// user function bugs.
@@ -464,27 +472,46 @@ func (fh *functionHandler) tapService(fn *fv1.Function, serviceURL *url.URL) {
 	fh.executor.TapService(fn.ObjectMeta, fn.Spec.InvokeStrategy.ExecutionStrategy.ExecutorType, *serviceURL)
 }
 
+func parseStickinessCookie(request *http.Request) (*stickinessCookie, *http.Cookie, error) {
+	var stickinessCookie *stickinessCookie = nil
+	cookie, err := request.Cookie(STICKINESS_COOKIE)
+	if err != nil {
+		return nil, nil, err
+	}
+	err = json.Unmarshal([]byte(cookie.Value), stickinessCookie)
+	return stickinessCookie, cookie, err
+}
+
+func (fh functionHandler) invalidateStrictStickinessCookie(responseWriter http.ResponseWriter, cookie *http.Cookie) {
+	fh.logger.Debug("invalid stickiness cookie (strict type)", zap.Any("cookie", cookie))
+	cookie.MaxAge = -1
+	responseWriter.Header().Add("Set-Cookie", cookie.String())
+	responseWriter.WriteHeader(http.StatusInternalServerError)
+	responseWriter.Write([]byte("Invalid stickiness cookie (strict type)"))
+}
+
 func (fh functionHandler) handler(responseWriter http.ResponseWriter, request *http.Request) {
 
-	var stickyCookie *stickinessCookie = nil
+	var stickinessCookie *stickinessCookie
 	if fh.stickinessParams.enabled {
-		cookie, err := request.Cookie(STICKINESS_COOKIE)
+		maybeValid, cookie, err := parseStickinessCookie(request)
 		if err == nil {
-			err = json.Unmarshal([]byte(cookie.Value), stickyCookie)
-			if err == nil {
-				fn := fh.functionMap[stickyCookie.FuncName]
-				if fn == nil {
-					// The sticky function no longer exists so the request cannot be handled
-					// TODO : write error to responseWrite and return response
-					return
-				}
+			fn := fh.functionMap[stickinessCookie.FuncName]
+			if fn != nil {
+				// TODO : Check service address here
+				// use the function specified by the stickiness cookie
 				fh.function = fn
-				fh.logger.Debug("sticky function metadata", zap.Any("metadata", fh.function))
+				stickinessCookie = maybeValid
+				fh.logger.Debug("chosen function backend's metadata (stickiness cookie)", zap.Any("metadata", fh.function))
+			} else if stickinessCookie.Type == STRICT {
+				// the cookie is strict and invalid so this request cannot be handled
+				fh.invalidateStrictStickinessCookie(responseWriter, cookie)
+				return
 			}
 		}
 	}
 
-	if stickyCookie == nil && fh.httpTrigger != nil && fh.httpTrigger.Spec.FunctionReference.Type == fv1.FunctionReferenceTypeFunctionWeights {
+	if stickinessCookie == nil && fh.httpTrigger != nil && fh.httpTrigger.Spec.FunctionReference.Type == fv1.FunctionReferenceTypeFunctionWeights {
 		// canary deployment. need to determine the function to send request to now
 		fn := getCanaryBackend(fh.functionMap, fh.fnWeightDistributionList)
 		if fn == nil {
@@ -517,10 +544,10 @@ func (fh functionHandler) handler(responseWriter http.ResponseWriter, request *h
 	}
 
 	rrt := &RetryingRoundTripper{
-		logger:       fh.logger.Named("roundtripper"),
-		funcHandler:  &fh,
-		funcTimeout:  time.Duration(fnTimeout) * time.Second,
-		stickyCookie: stickyCookie,
+		logger:           fh.logger.Named("roundtripper"),
+		funcHandler:      &fh,
+		funcTimeout:      time.Duration(fnTimeout) * time.Second,
+		stickinessCookie: stickinessCookie,
 	}
 
 	start := time.Now()
