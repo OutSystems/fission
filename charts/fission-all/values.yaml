@@ -241,7 +241,7 @@ router:
     maxRetries: 10
 
   stickiness:
-    ## If true, router will check incoming requests for a sticky cookie, requests containing a
+    ## If true, router will check incoming requests for a stickiness cookie, requests containing a
     ## stickiness cookie with a valid service address will be routed to the specified function pod.
     ##
     ## If false, router ignores sticky cookies and the default load balancing behaviour applies.
