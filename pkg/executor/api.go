@@ -50,7 +50,7 @@ func (executor *Executor) getServiceForFunctionAPI(w http.ResponseWriter, r *htt
 	fn := &fv1.Function{}
 	err = json.Unmarshal(body, &fn)
 	if err != nil {
-		http.Error(w, "Failed to request", http.StatusBadRequest)
+		http.Error(w, "Failed to parse request", http.StatusBadRequest)
 		return
 	}
 
@@ -345,8 +345,6 @@ func (executor *Executor) GetHandler() http.Handler {
 
 // Serve starts an HTTP server.
 func (executor *Executor) Serve(ctx context.Context, port int) {
-	executor.logger.Info("Started HTTP Server for api")
-
 	handler := otelUtils.GetHandlerWithOTEL(executor.GetHandler(), "fission-executor", otelUtils.UrlsToIgnore("/healthz"))
 	httpserver.StartServer(ctx, executor.logger, "executor", fmt.Sprintf("%d", port), handler)
 }
