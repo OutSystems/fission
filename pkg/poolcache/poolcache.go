@@ -33,7 +33,7 @@ type requestType int
 
 const (
 	getValue requestType = iota
-	getValueByAddress
+	getValueByFunctionAndAndress
 	listAvailableValue
 	setValue
 	markAvailable
@@ -90,8 +90,8 @@ func (c *Cache) service() {
 		req := <-c.requestChannel
 		resp := &response{}
 		switch req.requestType {
-		case getValueByAddress:
-			otelUtils.LoggerWithTraceID(req.ctx, c.logger).Debug("Get value By Address And Function", zap.String("function", req.function.(string)), zap.String("address", req.address.(string)))
+		case getValueByFunctionAndAndress:
+			otelUtils.LoggerWithTraceID(req.ctx, c.logger).Debug("Get value By Function And Address", zap.String("function", req.function.(string)), zap.String("address", req.address.(string)))
 
 			value := c.cache[req.function][req.address]
 
@@ -204,12 +204,12 @@ func (c *Cache) GetValue(ctx context.Context, function interface{}, requestsPerP
 	return resp.value, resp.totalActive, resp.error
 }
 
-// GetValueByAddress returns a value interface with status inActive else return error
-func (c *Cache) GetValueByAddress(ctx context.Context, function interface{}, address string) (interface{}, error) {
+// GetValueByFunctionAndAndress returns a value interface for the given function and address
+func (c *Cache) GetValueByFunctionAndAndress(ctx context.Context, function interface{}, address string) (interface{}, error) {
 	respChannel := make(chan *response)
 	c.requestChannel <- &request{
 		ctx:             ctx,
-		requestType:     getValueByAddress,
+		requestType:     getValueByFunctionAndAndress,
 		function:        function,
 		address:         address,
 		responseChannel: respChannel,
