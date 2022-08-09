@@ -297,7 +297,7 @@ func (executor *Executor) isValidHandler(w http.ResponseWriter, r *http.Request)
 		logger.Info("The isValidHandler was only implemented to check the executor type Poolmgr")
 	}
 
-	//if we reach here, it means that the function is not valid
+	// the function and/or service address are not valid
 	executor.writeResponse(w, "false", funct.ObjectMeta.Name)
 }
 
