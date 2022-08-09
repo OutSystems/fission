@@ -275,9 +275,9 @@ func (executor *Executor) isValidHandler(w http.ResponseWriter, r *http.Request)
 	funct := fn.Function
 
 	if t == fv1.ExecutorTypePoolmgr && !funct.Spec.OnceOnly {
+		// Check if a specialized pod for the function has a matching service address
 		fsvc, err := et.GetFuncSvcFromPoolCacheByAddress(ctx, &fn.Function, fn.SvcAddress)
 
-		// check if its a cache hit (check if there is already specialized function pod that can serve another request)
 		if err == nil {
 			if et.IsValid(ctx, fsvc) {
 				// return true
