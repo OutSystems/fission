@@ -91,15 +91,14 @@ func (c *Cache) service() {
 		resp := &response{}
 		switch req.requestType {
 		case getValueByFunctionAndAndress:
-			otelUtils.LoggerWithTraceID(req.ctx, c.logger).Debug("Get value By Function And Address", zap.String("function", req.function.(string)), zap.String("address", req.address.(string)))
-
+			otelUtils.LoggerWithTraceID(req.ctx, c.logger).Debug("Get value by function and address", zap.String("function", req.function.(string)), zap.String("address", req.address.(string)))
 			value := c.cache[req.function][req.address]
 
 			if value != nil {
 				otelUtils.LoggerWithTraceID(req.ctx, c.logger).Debug("Found function service", zap.String("function", req.function.(string)), zap.String("address", req.address.(string)))
 				resp.value = value.val
 			} else {
-				otelUtils.LoggerWithTraceID(req.ctx, c.logger).Warn("Address or Function was not found", zap.String("function", req.function.(string)), zap.String("address", req.address.(string)))
+				otelUtils.LoggerWithTraceID(req.ctx, c.logger).Warn("Address or function was not found", zap.String("function", req.function.(string)), zap.String("address", req.address.(string)))
 				resp.error = ferror.MakeError(ferror.ErrorNotFound, fmt.Sprintf("address '%v' or function '%v' not found", req.address.(string), req.function.(string)))
 			}
 			req.responseChannel <- resp
