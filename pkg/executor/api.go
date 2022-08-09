@@ -280,12 +280,9 @@ func (executor *Executor) isValidHandler(w http.ResponseWriter, r *http.Request)
 
 		if err == nil {
 			if et.IsValid(ctx, fsvc) {
-				// return true
 				logger.Debug("served from cache", zap.String("name", fsvc.Name), zap.String("address", fsvc.Address))
-
 				executor.writeResponse(w, "true", funct.ObjectMeta.Name)
 
-				//return true
 				return
 			}
 			logger.Debug("deleting cache entry for invalid address",
