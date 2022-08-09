@@ -121,11 +121,6 @@ skaffold-clean:
 	skaffold delete 2>/dev/null || true
 	kubectl delete namespace fission 2>/dev/null || true
 
-skaffold-clean:
-	@echo "🔥 Delete fission release"
-	skaffold delete 2>/dev/null || true
-	kubectl delete namespace fission 2>/dev/null || true
-
 ### Release
 release:
 	@./hack/generate-helm-manifest.sh $(VERSION)
