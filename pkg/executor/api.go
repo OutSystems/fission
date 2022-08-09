@@ -262,7 +262,7 @@ func (executor *Executor) isValidHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	// get function metadata
-	fn := &functionWithAddress{}
+	fn := &fv1.FunctionWithAddress{}
 	err = json.Unmarshal(body, &fn)
 	if err != nil {
 		logger.Error("Error unmarshalling: ", zap.Any("error", err))
@@ -319,10 +319,3 @@ func (executor *Executor) Serve(ctx context.Context, port int) {
 	handler := otelUtils.GetHandlerWithOTEL(executor.GetHandler(), "fission-executor", otelUtils.UrlsToIgnore("/healthz"))
 	httpserver.StartServer(ctx, executor.logger, "executor", fmt.Sprintf("%d", port), handler)
 }
-
-type (
-	functionWithAddress struct {
-		SvcAddress string       `json:"svcAddress"`
-		Function   fv1.Function `json:"function"`
-	}
-)
