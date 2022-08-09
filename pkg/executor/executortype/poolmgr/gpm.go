@@ -214,7 +214,7 @@ func (gpm *GenericPoolManager) GetFuncSvcFromPoolCache(ctx context.Context, fn *
 
 func (gpm *GenericPoolManager) GetFuncSvcFromPoolCacheByAddress(ctx context.Context, fn *fv1.Function, fsvcAddress string) (*fscache.FuncSvc, error) {
 	otelUtils.SpanTrackEvent(ctx, "GetFuncSvcFromPoolCacheByAddress", otelUtils.GetAttributesForFunction(fn)...)
-	return gpm.fsCache.GetByAddress(ctx, &fn.ObjectMeta, fsvcAddress)
+	return gpm.fsCache.GetByFunctionAndAddress(ctx, &fn.ObjectMeta, fsvcAddress)
 }
 
 func (gpm *GenericPoolManager) DeleteFuncSvcFromCache(ctx context.Context, fsvc *fscache.FuncSvc) {
