@@ -291,7 +291,7 @@ func (executor *Executor) isValidHandler(w http.ResponseWriter, r *http.Request)
 				zap.String("address", fsvc.Address))
 			et.DeleteFuncSvcFromCache(ctx, fsvc)
 		} else {
-			logger.Debug("Couldn't get function service for address and function ", zap.String("address", fn.SvcAddress), zap.String("function_name", funct.ObjectMeta.Name), zap.Error("Error ", err))
+			logger.Debug("Couldn't get function service for address and function ", zap.String("address", fn.SvcAddress), zap.String("function_name", funct.ObjectMeta.Name), zap.Error(err))
 		}
 	} else if t == fv1.ExecutorTypeNewdeploy || t == fv1.ExecutorTypeContainer {
 		logger.Info("The isValidHandler was only implemented to check the executor type Poolmgr")
