@@ -280,7 +280,7 @@ func (executor *Executor) isValidHandler(w http.ResponseWriter, r *http.Request)
 
 		if err == nil {
 			if et.IsValid(ctx, fsvc) {
-				logger.Debug("served from cache", zap.String("name", fsvc.Name), zap.String("address", fsvc.Address))
+				logger.Debug("found matching function service in cache", zap.String("name", fsvc.Name), zap.String("address", fsvc.Address))
 				executor.writeResponse(w, "true", funct.ObjectMeta.Name)
 
 				return
