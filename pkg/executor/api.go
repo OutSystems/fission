@@ -302,7 +302,6 @@ func (executor *Executor) isValidHandler(w http.ResponseWriter, r *http.Request)
 
 	//if we reach here, it means that the function is not valid
 	executor.writeResponse(w, "false", funct.ObjectMeta.Name)
-	return
 }
 
 // GetHandler returns an http.Handler.
