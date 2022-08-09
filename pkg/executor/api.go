@@ -265,7 +265,7 @@ func (executor *Executor) isValidHandler(w http.ResponseWriter, r *http.Request)
 	fn := &functionWithAddress{}
 	err = json.Unmarshal(body, &fn)
 	if err != nil {
-		logger.Error("Error unmarshelling: ", zap.Any("error", err))
+		logger.Error("Error unmarshalling: ", zap.Any("error", err))
 		http.Error(w, "Failed to parse request", http.StatusBadRequest)
 		return
 	}
