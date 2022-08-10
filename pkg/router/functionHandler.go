@@ -19,6 +19,7 @@ package router
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -478,7 +479,11 @@ func parseStickinessCookie(request *http.Request) (*stickinessCookie, *http.Cook
 	if err != nil {
 		return nil, nil, err
 	}
-	err = json.Unmarshal([]byte(cookie.Value), stickinessCookie)
+	cookieBytes, err := base64.StdEncoding.DecodeString(cookie.Value)
+	if err != nil {
+		return nil, nil, err
+	}
+	err = json.Unmarshal(cookieBytes, stickinessCookie)
 	return stickinessCookie, cookie, err
 }
 
