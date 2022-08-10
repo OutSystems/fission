@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -203,34 +204,39 @@ func (c *Client) _tapService(ctx context.Context, tapSvcReqs []TapServiceRequest
 }
 
 // IsValid will return true if the service uid and address are found
-func (c *Client) IsValid(ctx context.Context, fn *fv1.FunctionWithAddress) (string, error) {
+func (c *Client) IsValid(ctx context.Context, fn *fv1.FunctionWithAddress) (bool, error) {
 	executorURL := c.executorURL + "/v2/isValid"
 
 	body, err := json.Marshal(fn)
 	if err != nil {
-		return "", errors.Wrap(err, "could not marshal request body for checking function with address")
+		return false, errors.Wrap(err, "could not marshal request body for checking function with address")
 	}
 
 	req, err := retryablehttp.NewRequestWithContext(ctx, "POST", executorURL, bytes.NewReader(body))
 	if err != nil {
-		return "", errors.Wrap(err, "could not create request for checking function with address")
+		return false, errors.Wrap(err, "could not create request for checking function with address")
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", errors.Wrap(err, "error posting to checking function with address")
+		return false, errors.Wrap(err, "error posting to checking function with address")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return "", ferror.MakeErrorFromHTTP(resp)
+		return false, ferror.MakeErrorFromHTTP(resp)
 	}
 
 	isValid, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", errors.Wrap(err, "error reading response body from checking function with address")
+		return false, errors.Wrap(err, "error reading response body from checking function with address")
 	}
 
-	return string(isValid), nil
+	boolIsValid, err := strconv.ParseBool(string(isValid))
+	if err != nil {
+		return false, errors.Wrap(err, "error parsing isValid string to boolIsValid")
+	}
+
+	return boolIsValid, nil
 }
