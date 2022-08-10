@@ -516,6 +516,8 @@ func (fh functionHandler) handler(responseWriter http.ResponseWriter, request *h
 				}
 				return
 			}
+		} else {
+			fh.logger.Debug("failed to parse stickiness cookie", zap.Error(err))
 		}
 	}
 
