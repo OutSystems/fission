@@ -227,10 +227,10 @@ func (c *Client) IsValid(ctx context.Context, fn *fv1.FunctionWithAddress) (stri
 		return "", ferror.MakeErrorFromHTTP(resp)
 	}
 
-	svcName, err := io.ReadAll(resp.Body)
+	isValid, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", errors.Wrap(err, "error reading response body from checking function with address")
 	}
 
-	return string(svcName), nil
+	return string(isValid), nil
 }
