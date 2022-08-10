@@ -33,6 +33,7 @@ type requestType int
 
 const (
 	getValue requestType = iota
+	getValueByFunctionAndAndress
 	listAvailableValue
 	setValue
 	markAvailable
@@ -89,6 +90,18 @@ func (c *Cache) service() {
 		req := <-c.requestChannel
 		resp := &response{}
 		switch req.requestType {
+		case getValueByFunctionAndAndress:
+			otelUtils.LoggerWithTraceID(req.ctx, c.logger).Debug("Get value by function and address", zap.String("function", req.function.(string)), zap.String("address", req.address.(string)))
+			value := c.cache[req.function][req.address]
+
+			if value != nil {
+				otelUtils.LoggerWithTraceID(req.ctx, c.logger).Debug("Found function service", zap.String("function", req.function.(string)), zap.String("address", req.address.(string)))
+				resp.value = value.val
+			} else {
+				otelUtils.LoggerWithTraceID(req.ctx, c.logger).Warn("Address or function was not found", zap.String("function", req.function.(string)), zap.String("address", req.address.(string)))
+				resp.error = ferror.MakeError(ferror.ErrorNotFound, fmt.Sprintf("address '%v' or function '%v' not found", req.address.(string), req.function.(string)))
+			}
+			req.responseChannel <- resp
 		case getValue:
 			values, ok := c.cache[req.function]
 			found := false
@@ -188,6 +201,20 @@ func (c *Cache) GetValue(ctx context.Context, function interface{}, requestsPerP
 	}
 	resp := <-respChannel
 	return resp.value, resp.totalActive, resp.error
+}
+
+// GetValueByFunctionAndAndress returns a value interface for the given function and address
+func (c *Cache) GetValueByFunctionAndAndress(ctx context.Context, function interface{}, address string) (interface{}, error) {
+	respChannel := make(chan *response)
+	c.requestChannel <- &request{
+		ctx:             ctx,
+		requestType:     getValueByFunctionAndAndress,
+		function:        function,
+		address:         address,
+		responseChannel: respChannel,
+	}
+	resp := <-respChannel
+	return resp.value, resp.error
 }
 
 // ListAvailableValue returns a list of the available function services stored in the Cache

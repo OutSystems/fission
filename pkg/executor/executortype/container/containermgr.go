@@ -183,6 +183,11 @@ func (caaf *Container) GetFuncSvcFromPoolCache(ctx context.Context, fn *fv1.Func
 	return nil, 0, nil
 }
 
+func (caaf *Container) GetFuncSvcFromPoolCacheByAddress(ctx context.Context, fn *fv1.Function, fsvcAddress string) (*fscache.FuncSvc, error) {
+	// Not Implemented for NewDeployment. Will be used when support of concurrent specialization of same function is added.
+	return nil, nil
+}
+
 // TapService makes a TouchByAddress request to the cache.
 func (caaf *Container) TapService(ctx context.Context, svcHost string) error {
 	err := caaf.fsCache.TouchByAddress(svcHost)

@@ -171,6 +171,26 @@ func (fsc *FunctionServiceCache) service() {
 	}
 }
 
+// GetByFunctionAndAddress gets a function service from cache using the function and the address
+func (fsc *FunctionServiceCache) GetByFunctionAndAddress(ctx context.Context, m *metav1.ObjectMeta, fsvcAddress string) (*FuncSvc, error) {
+	fsc.logger.Debug("Checking the address:", zap.String("fsvcAddress", fsvcAddress))
+	key := crd.CacheKey(m)
+	fsc.logger.Debug("Checking the function:", zap.String("function name (key)", key))
+
+	fsvcI, err := fsc.connFunctionCache.GetValueByFunctionAndAndress(ctx, key, fsvcAddress)
+	if err != nil {
+		fsc.logger.Debug("Address or function was not found in Cache", zap.String("fsvcAddress", fsvcAddress), zap.Any("function uid", m.UID))
+		return nil, err
+	}
+
+	// update atime
+	fsvc := fsvcI.(*FuncSvc)
+	fsvc.Atime = time.Now()
+
+	fsvcCopy := *fsvc
+	return &fsvcCopy, nil
+}
+
 // GetByFunction gets a function service from cache using function key.
 func (fsc *FunctionServiceCache) GetByFunction(m *metav1.ObjectMeta) (*FuncSvc, error) {
 	key := crd.CacheKey(m)

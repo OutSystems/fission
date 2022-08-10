@@ -41,6 +41,9 @@ type ExecutorType interface {
 	// GetFuncSvcFromPoolCache retrieves function service and number of active instances after filtering on requestsPerPod and CPULimit
 	GetFuncSvcFromPoolCache(ctx context.Context, fn *fv1.Function, requestsPerPod int) (*fscache.FuncSvc, int, error)
 
+	// GetFuncSvcFromPoolCacheByAddress retrieves function service by Address
+	GetFuncSvcFromPoolCacheByAddress(ctx context.Context, fn *fv1.Function, fsvcAddress string) (*fscache.FuncSvc, error)
+
 	// DeleteFuncSvcFromCache deletes function service entry in cache.
 	DeleteFuncSvcFromCache(context.Context, *fscache.FuncSvc)
 
