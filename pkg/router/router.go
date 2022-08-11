@@ -185,6 +185,17 @@ func Start(ctx context.Context, logger *zap.Logger, port int, executorURL string
 			zap.Duration("default", unTapServiceTimeout))
 	}
 
+	// isValidTimeout is the timeout used as timeout in the request context of isValid
+	isValidTimeoutstr := os.Getenv("ROUTER_IS_VALID_TIMEOUT")
+	isValidTimeout, err := time.ParseDuration(isValidTimeoutstr)
+	if err != nil {
+		isValidTimeout = 30 * time.Second
+		logger.Error("failed to parse isValid timeout duration from 'ROUTER_IS_VALID_TIMEOUT' - set to the default value",
+			zap.Error(err),
+			zap.String("value", isValidTimeoutstr),
+			zap.Duration("default", isValidTimeout))
+	}
+
 	tracingSamplingRateStr := os.Getenv("TRACING_SAMPLING_RATE")
 	tracingSamplingRate, err := strconv.ParseFloat(tracingSamplingRateStr, 64)
 	if err != nil {
@@ -227,7 +238,7 @@ func Start(ctx context.Context, logger *zap.Logger, port int, executorURL string
 		&stickinessParams{
 			enabled: stickinessEnable,
 		},
-		isDebugEnv, unTapServiceTimeout, throttler.MakeThrottler(svcAddrUpdateTimeout))
+		isDebugEnv, unTapServiceTimeout, isValidTimeout, throttler.MakeThrottler(svcAddrUpdateTimeout))
 
 	go metrics.ServeMetrics(ctx, logger)
 

@@ -59,11 +59,12 @@ type HTTPTriggerSet struct {
 	isDebugEnv                 bool
 	svcAddrUpdateThrottler     *throttler.Throttler
 	unTapServiceTimeout        time.Duration
+	isValidTimeout             time.Duration
 }
 
 func makeHTTPTriggerSet(logger *zap.Logger, fmap *functionServiceMap, fissionClient versioned.Interface,
 	kubeClient kubernetes.Interface, executor *executorClient.Client, params *tsRoundTripperParams,
-	stickiness *stickinessParams, isDebugEnv bool, unTapServiceTimeout time.Duration,
+	stickiness *stickinessParams, isDebugEnv bool, unTapServiceTimeout time.Duration, isValidTimeout time.Duration,
 	actionThrottler *throttler.Throttler) *HTTPTriggerSet {
 
 	httpTriggerSet := &HTTPTriggerSet{
@@ -79,6 +80,7 @@ func makeHTTPTriggerSet(logger *zap.Logger, fmap *functionServiceMap, fissionCli
 		isDebugEnv:                 isDebugEnv,
 		svcAddrUpdateThrottler:     actionThrottler,
 		unTapServiceTimeout:        unTapServiceTimeout,
+		isValidTimeout:             isValidTimeout,
 	}
 
 	informerFactory := genInformer.NewSharedInformerFactory(fissionClient, time.Minute*30)
@@ -159,6 +161,7 @@ func (ts *HTTPTriggerSet) getRouter(fnTimeoutMap map[types.UID]int) *mux.Router 
 			svcAddrUpdateThrottler:   ts.svcAddrUpdateThrottler,
 			functionTimeoutMap:       fnTimeoutMap,
 			unTapServiceTimeout:      ts.unTapServiceTimeout,
+			isValidTimeout:           ts.isValidTimeout,
 		}
 
 		// The functionHandler for HTTP trigger with fn reference type "FunctionReferenceTypeFunctionName",
@@ -256,6 +259,7 @@ func (ts *HTTPTriggerSet) getRouter(fnTimeoutMap map[types.UID]int) *mux.Router 
 			svcAddrUpdateThrottler: ts.svcAddrUpdateThrottler,
 			functionTimeoutMap:     fnTimeoutMap,
 			unTapServiceTimeout:    ts.unTapServiceTimeout,
+			isValidTimeout:         ts.isValidTimeout,
 		}
 
 		var handler http.Handler

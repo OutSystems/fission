@@ -78,6 +78,7 @@ type (
 		svcAddrUpdateThrottler   *throttler.Throttler
 		functionTimeoutMap       map[k8stypes.UID]int
 		unTapServiceTimeout      time.Duration
+		isValidTimeout           time.Duration
 	}
 
 	stickinessType string
@@ -502,22 +503,37 @@ func (fh functionHandler) handler(responseWriter http.ResponseWriter, request *h
 		maybeValid, cookie, err := parseStickinessCookie(request)
 		if err == nil {
 			fn := fh.functionMap[stickinessCookie.FuncName]
+			isValid := false
 			if fn != nil {
-				// TODO : Check service address here
-				// use the function specified by the stickiness cookie
+				ctx, cancel := context.WithTimeout(context.Background(), fh.isValidTimeout)
+				defer cancel()
+				isValid, err = fh.executor.IsValid(ctx, &fv1.FunctionWithAddress{
+					SvcAddress: maybeValid.SvcAddress.String(),
+					Function:   *fn,
+				})
+				if err != nil {
+					fh.logger.Error("request to executor isValid endpoint failed", zap.Error(err))
+					// TODO : write error to responseWrite and return response
+					return
+				}
+			}
+
+			if isValid {
 				fh.function = fn
 				stickinessCookie = maybeValid
 				fh.logger.Debug("chosen function backend's metadata (stickiness cookie)", zap.Any("metadata", fh.function))
 			} else if stickinessCookie.Type == STRICT {
 				// the cookie is strict and invalid so this request cannot be handled
+				fh.logger.Debug("expiring invalid stickiness cookie")
 				_, err = fh.invalidateStrictStickinessCookie(responseWriter, cookie)
 				if err != nil {
 					fh.logger.Error("error writing invalid stickiness cookie response", zap.Error(err))
 				}
 				return
 			}
+
 		} else {
-			fh.logger.Debug("failed to parse stickiness cookie", zap.Error(err))
+			fh.logger.Debug("failed to parse stickiness cookie, will be ignored", zap.Error(err))
 		}
 	}
 

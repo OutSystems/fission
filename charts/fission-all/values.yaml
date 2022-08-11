@@ -192,6 +192,9 @@ router:
   ## unTapService is called to free up the resources once the function invocation is done.
   ##
   unTapServiceTimeout: 3600s
+  ## isValidTimeout is the timeout used in the request context of isValid.
+  ## isValid is called to check if a function service referenced by a stickiness cookie is still valid.
+  isValidTimeout: 30s
   ## displayAccessLog display endpoing access logs
   ## Please be aware of enabling logging endpoint access log, it increases
   ## router resource utilization when under heavy workloads.
