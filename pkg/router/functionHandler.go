@@ -84,7 +84,7 @@ type (
 	stickinessType string
 
 	stickinessCookie struct {
-		SvcAddress url.URL        `json:"svcAddress"`
+		SvcAddress string         `json:"svcAddress"`
 		FuncName   string         `json:"funcName"`
 		Type       stickinessType `json:"type"`
 	}
@@ -252,7 +252,11 @@ func (roundTripper *RetryingRoundTripper) RoundTrip(req *http.Request) (*http.Re
 
 			if roundTripper.stickinessCookie != nil {
 				// get function service url from stickiness cookie
-				roundTripper.serviceURL = &roundTripper.stickinessCookie.SvcAddress
+				svcAddress, err := url.Parse(fmt.Sprintf("http://%v", roundTripper.stickinessCookie.SvcAddress))
+				if err != nil {
+					return nil, err
+				}
+				roundTripper.serviceURL = svcAddress
 				roundTripper.urlFromCache = false
 			} else {
 				// get function service url from cache or executor
@@ -474,18 +478,23 @@ func (fh *functionHandler) tapService(fn *fv1.Function, serviceURL *url.URL) {
 	fh.executor.TapService(fn.ObjectMeta, fn.Spec.InvokeStrategy.ExecutionStrategy.ExecutorType, *serviceURL)
 }
 
-func parseStickinessCookie(request *http.Request) (*stickinessCookie, *http.Cookie, error) {
-	var stickinessCookie *stickinessCookie = nil
+func (fh functionHandler) parseStickinessCookie(request *http.Request) (*stickinessCookie, *http.Cookie, error) {
+	var stickinessCookie stickinessCookie
 	cookie, err := request.Cookie(STICKINESS_COOKIE)
 	if err != nil {
+		fh.logger.Debug("failed to get stickiness cookie value", zap.Error(err))
 		return nil, nil, err
 	}
 	cookieBytes, err := base64.StdEncoding.DecodeString(cookie.Value)
 	if err != nil {
+		fh.logger.Debug("failed to decode stickiness cookie value", zap.Error(err), zap.String("cookieValue", cookie.Value))
 		return nil, nil, err
 	}
-	err = json.Unmarshal(cookieBytes, stickinessCookie)
-	return stickinessCookie, cookie, err
+	err = json.Unmarshal(cookieBytes, &stickinessCookie)
+	if err != nil {
+		fh.logger.Debug("failed to unmarshal stickiness cookie", zap.Error(err), zap.String("cookieString", string(cookieBytes)))
+	}
+	return &stickinessCookie, cookie, err
 }
 
 func (fh functionHandler) invalidateStrictStickinessCookie(responseWriter http.ResponseWriter, cookie *http.Cookie) (int, error) {
@@ -500,17 +509,12 @@ func (fh functionHandler) handler(responseWriter http.ResponseWriter, request *h
 
 	var stickinessCookie *stickinessCookie
 	if fh.stickinessParams.enabled {
-		maybeValid, cookie, err := parseStickinessCookie(request)
+		maybeValid, cookie, err := fh.parseStickinessCookie(request)
 		if err == nil {
-			fn := fh.functionMap[stickinessCookie.FuncName]
+			fn := fh.functionMap[maybeValid.FuncName]
 			isValid := false
 			if fn != nil {
-				ctx, cancel := context.WithTimeout(context.Background(), fh.isValidTimeout)
-				defer cancel()
-				isValid, err = fh.executor.IsValid(ctx, &fv1.FunctionWithAddress{
-					SvcAddress: maybeValid.SvcAddress.String(),
-					Function:   *fn,
-				})
+				isValid, err = fh.isValid(fn, maybeValid.SvcAddress)
 				if err != nil {
 					fh.logger.Error("request to executor isValid endpoint failed", zap.Error(err))
 					// TODO : write error to responseWrite and return response
@@ -678,6 +682,24 @@ func (roundTripper RetryingRoundTripper) addForwardedHostHeader(req *http.Reques
 
 	req.Header.Set(FORWARDED, host)
 	req.Header.Set(X_FORWARDED_HOST, req.Host)
+}
+
+// isValid checks the executor to determine if the service address is valid
+func (fh functionHandler) isValid(fn *fv1.Function, svcAddress string) (bool, error) {
+	fh.logger.Debug("isValid Called")
+	ctx, cancel := context.WithTimeout(context.Background(), fh.isValidTimeout)
+	defer cancel()
+	isValid, err := fh.executor.IsValid(ctx, fv1.FunctionWithAddress{SvcAddress: svcAddress, Function: fn})
+	if err != nil {
+		statusCode, errMsg := ferror.GetHTTPError(err)
+		fh.logger.Error("error from IsValid",
+			zap.Error(err),
+			zap.String("error_message", errMsg),
+			zap.Any("function", fh.function),
+			zap.Int("status_code", statusCode))
+		return false, err
+	}
+	return isValid, nil
 }
 
 // unTapservice marks the serviceURL in executor's cache as inactive, so that it can be reused
