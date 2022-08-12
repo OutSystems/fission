@@ -499,6 +499,8 @@ func (fh functionHandler) parseStickinessCookie(request *http.Request) (*stickin
 
 func (fh functionHandler) invalidateStrictStickinessCookie(responseWriter http.ResponseWriter, cookie *http.Cookie) (int, error) {
 	fh.logger.Debug("invalid stickiness cookie (strict type)", zap.Any("cookie", cookie))
+	// This is a bit misleading, the SetCookie function will actually set the Max-Age to zero if this number is negative
+	// and will not set a Max-Age at all if this value is zero.
 	cookie.MaxAge = -1
 	http.SetCookie(responseWriter, cookie)
 	responseWriter.WriteHeader(http.StatusInternalServerError)
