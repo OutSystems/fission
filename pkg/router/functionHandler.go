@@ -526,7 +526,7 @@ func (fh functionHandler) handler(responseWriter http.ResponseWriter, request *h
 				fh.function = fn
 				stickinessCookie = maybeValid
 				fh.logger.Debug("chosen function backend's metadata (stickiness cookie)", zap.Any("metadata", fh.function))
-			} else if stickinessCookie.Type == STRICT {
+			} else if maybeValid.Type == STRICT {
 				// the cookie is strict and invalid so this request cannot be handled
 				fh.logger.Debug("expiring invalid stickiness cookie")
 				_, err = fh.invalidateStrictStickinessCookie(responseWriter, cookie)
