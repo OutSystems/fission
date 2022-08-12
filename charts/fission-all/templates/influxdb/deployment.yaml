@@ -36,6 +36,8 @@ spec:
       - name: influxdb
         image: {{ .Values.influxdb.image | quote }}
         imagePullPolicy: {{ .Values.pullPolicy }}
+        resources:
+          {{- toYaml .Values.influxdb.resources | nindent 10 }}
         env:
         - name: INFLUXDB_DB
           value: fissionFunctionLog

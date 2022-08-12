@@ -462,6 +462,17 @@ kafka:
   ##
   # version: "0.11.2.0"
 
+  ## Pod resources as:
+  ##  resources:
+  ##    limits:
+  ##      cpu: <tbd>
+  ##      memory: <tbd>
+  ##    requests:
+  ##      cpu: <tbd>
+  ##      memory: <tbd>
+  ##
+  resources: {}
+
 serviceMonitor:
   enabled: false
   ##namespace in which you want to deploy servicemonitor
@@ -529,7 +540,18 @@ persistence:
 ## Analytics let us count how many people installed fission. Set to
 ## false to disable analytics.
 ##
-analytics: true
+analytics: 
+  enabled: true
+  ## Pod resources as:
+  ##  resources:
+  ##    limits:
+  ##      cpu: <tbd>
+  ##      memory: <tbd>
+  ##    requests:
+  ##      cpu: <tbd>
+  ##      memory: <tbd>
+  ##
+  resources: {}
 
 ## Internally used for generating an analytics job for non-helm installs
 ##
@@ -568,12 +590,32 @@ logger:
     # example values for linkerd
     #- NET_RAW
     #- NET_ADMIN
+  ## Pod resources as:
+  ##  resources:
+  ##    limits:
+  ##      cpu: <tbd>
+  ##      memory: <tbd>
+  ##    requests:
+  ##      cpu: <tbd>
+  ##      memory: <tbd>
+  ##
+  resources: {}
 
 ## Enable InfluxDB
 ##
 influxdb:
   enabled: false
   image: influxdb:1.8
+  ## Pod resources as:
+  ##  resources:
+  ##    limits:
+  ##      cpu: <tbd>
+  ##      memory: <tbd>
+  ##    requests:
+  ##      cpu: <tbd>
+  ##      memory: <tbd>
+  ##
+  resources: {}
 
 ## Allow user to override busybox image used in fluent-bit init container
 ##
@@ -594,6 +636,16 @@ preUpgradeChecks:
   ## pre-install/pre-upgrade checks image version
   ##
   imageTag: v1.17.0-rc1
+  ## Pod resources as:
+  ##  resources:
+  ##    limits:
+  ##      cpu: <tbd>
+  ##      memory: <tbd>
+  ##    requests:
+  ##      cpu: <tbd>
+  ##      memory: <tbd>
+  ##
+  resources: {}
 
 ## Fission post-install/post-upgrade reporting live in this image
 ##

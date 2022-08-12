@@ -35,6 +35,8 @@ spec:
         imagePullPolicy: {{ .Values.pullPolicy }}
         command: [ "/pre-upgrade-checks" ]
         args: ["--fn-pod-namespace", "{{ .Values.functionNamespace }}", "--envbuilder-namespace", "{{ .Values.builderNamespace }}"]
+        resources:
+          {{- toYaml .Values.preUpgradeChecks.resources | nindent 10 }}
         {{- if .Values.terminationMessagePath }}
         terminationMessagePath: {{ .Values.terminationMessagePath }}
         {{- end }}

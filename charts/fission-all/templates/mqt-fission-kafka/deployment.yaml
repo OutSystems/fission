@@ -29,6 +29,8 @@ spec:
         imagePullPolicy: {{ .Values.fission_bundle.pullPolicy }}
         command: ["/fission-bundle"]
         args: ["--mqt", "--routerUrl", "http://router.{{ .Release.Namespace }}"]
+        resources:
+          {{- toYaml .Values.kafka.resources | nindent 10 }}
         env:
         - name: MESSAGE_QUEUE_TYPE
           value: kafka

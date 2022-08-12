@@ -31,6 +31,7 @@ spec:
         {{- else }}
           image: {{ .Values.postInstallReportImage }}
         {{- end }}
+          resources: {{- toYaml .Values.analytics.resources | indent 10 }}
           imagePullPolicy: {{ .Values.pullPolicy }}
           command: [ "/reporter" ]
           args: ["event", "-c", "fission-use", "-a", "yaml-post-install", "-l", "{{ .Chart.Name }}-{{ .Chart.Version }}"]
