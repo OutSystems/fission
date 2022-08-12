@@ -204,7 +204,7 @@ func (c *Client) _tapService(ctx context.Context, tapSvcReqs []TapServiceRequest
 }
 
 // IsValid will return true if the service uid and address are found
-func (c *Client) IsValid(ctx context.Context, fn *fv1.FunctionWithAddress) (bool, error) {
+func (c *Client) IsValid(ctx context.Context, fn fv1.FunctionWithAddress) (bool, error) {
 	executorURL := c.executorURL + "/v2/isValid"
 
 	body, err := json.Marshal(fn)

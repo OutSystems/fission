@@ -88,8 +88,8 @@ type (
 	// FunctionWithAddress is used in the isValid Handler, to check if the address and
 	//the function received exist
 	FunctionWithAddress struct {
-		SvcAddress string   `json:"svcAddress"`
-		Function   Function `json:"function"`
+		SvcAddress string    `json:"svcAddress"`
+		Function   *Function `json:"function"`
 	}
 
 	// Environment is environment for building and running user functions.

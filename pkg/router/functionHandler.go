@@ -19,6 +19,8 @@ package router
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand"
@@ -50,6 +52,15 @@ const (
 
 	// X_FORWARDED_HOST represents the 'X_FORWARDED_HOST' request header
 	X_FORWARDED_HOST = "X-Forwarded-Host"
+
+	// STICKINESS_COOKIE represents the stickiness cookie name
+	STICKINESS_COOKIE = "fission_sticky"
+
+	// LENIENT represents the lenient stickiness cookie type
+	LENIENT stickinessType = "lenient"
+
+	// STRICT represents the strict stickiness cookie type
+	STRICT stickinessType = "strict"
 )
 
 type (
@@ -61,11 +72,25 @@ type (
 		httpTrigger              *fv1.HTTPTrigger
 		functionMap              map[string]*fv1.Function
 		fnWeightDistributionList []functionWeightDistribution
+		stickinessParams         *stickinessParams
 		tsRoundTripperParams     *tsRoundTripperParams
 		isDebugEnv               bool
 		svcAddrUpdateThrottler   *throttler.Throttler
 		functionTimeoutMap       map[k8stypes.UID]int
 		unTapServiceTimeout      time.Duration
+		isValidTimeout           time.Duration
+	}
+
+	stickinessType string
+
+	stickinessCookie struct {
+		SvcAddress string         `json:"svcAddress"`
+		FuncName   string         `json:"funcName"`
+		Type       stickinessType `json:"type"`
+	}
+
+	stickinessParams struct {
+		enabled bool
 	}
 
 	tsRoundTripperParams struct {
@@ -93,6 +118,7 @@ type (
 		logger           *zap.Logger
 		funcHandler      *functionHandler
 		funcTimeout      time.Duration
+		stickinessCookie *stickinessCookie
 		closeContextFunc *context.CancelFunc
 		serviceURL       *url.URL
 		urlFromCache     bool
@@ -223,8 +249,20 @@ func (roundTripper *RetryingRoundTripper) RoundTrip(req *http.Request) (*http.Re
 			otelUtils.SpanTrackEvent(ctx, "getServiceEntry", otelUtils.MapToAttributes(map[string]string{
 				"function-name":      fnMeta.Name,
 				"function-namespace": fnMeta.Namespace})...)
-			// get function service url from cache or executor
-			roundTripper.serviceURL, roundTripper.urlFromCache, err = roundTripper.funcHandler.getServiceEntry(ctx)
+
+			if roundTripper.stickinessCookie != nil {
+				// get function service url from stickiness cookie
+				svcAddress, err := url.Parse(fmt.Sprintf("http://%v", roundTripper.stickinessCookie.SvcAddress))
+				if err != nil {
+					return nil, err
+				}
+				roundTripper.serviceURL = svcAddress
+				roundTripper.urlFromCache = false
+			} else {
+				// get function service url from cache or executor
+				roundTripper.serviceURL, roundTripper.urlFromCache, err = roundTripper.funcHandler.getServiceEntry(ctx)
+			}
+
 			if err != nil {
 				// We might want a specific error code or header for fission failures as opposed to
 				// user function bugs.
@@ -440,8 +478,72 @@ func (fh *functionHandler) tapService(fn *fv1.Function, serviceURL *url.URL) {
 	fh.executor.TapService(fn.ObjectMeta, fn.Spec.InvokeStrategy.ExecutionStrategy.ExecutorType, *serviceURL)
 }
 
+func (fh functionHandler) parseStickinessCookie(request *http.Request) (*stickinessCookie, *http.Cookie, error) {
+	var stickinessCookie stickinessCookie
+	cookie, err := request.Cookie(STICKINESS_COOKIE)
+	if err != nil {
+		fh.logger.Debug("failed to get stickiness cookie value", zap.Error(err))
+		return nil, nil, err
+	}
+	cookieBytes, err := base64.StdEncoding.DecodeString(cookie.Value)
+	if err != nil {
+		fh.logger.Warn("failed to decode stickiness cookie base64 value", zap.Error(err))
+		return nil, nil, err
+	}
+	err = json.Unmarshal(cookieBytes, &stickinessCookie)
+	if err != nil {
+		fh.logger.Warn("failed to unmarshal stickiness cookie JSON", zap.Error(err))
+	}
+	return &stickinessCookie, cookie, err
+}
+
+func (fh functionHandler) invalidateStrictStickinessCookie(responseWriter http.ResponseWriter, cookie *http.Cookie) (int, error) {
+	fh.logger.Debug("invalid stickiness cookie (strict type)", zap.Any("cookie", cookie))
+	// This is a bit misleading, the SetCookie function will actually set the Max-Age to zero if this number is negative
+	// and will not set a Max-Age at all if this value is zero.
+	cookie.MaxAge = -1
+	http.SetCookie(responseWriter, cookie)
+	responseWriter.WriteHeader(http.StatusInternalServerError)
+	return responseWriter.Write([]byte("Invalid stickiness cookie (strict type)"))
+}
+
 func (fh functionHandler) handler(responseWriter http.ResponseWriter, request *http.Request) {
-	if fh.httpTrigger != nil && fh.httpTrigger.Spec.FunctionReference.Type == fv1.FunctionReferenceTypeFunctionWeights {
+
+	var stickinessCookie *stickinessCookie
+	if fh.stickinessParams.enabled {
+		maybeValid, cookie, err := fh.parseStickinessCookie(request)
+		if err == nil {
+			fn := fh.functionMap[maybeValid.FuncName]
+			isValid := false
+			if fn != nil {
+				isValid, err = fh.isValid(fn, maybeValid.SvcAddress)
+				if err != nil {
+					fh.logger.Error("request to executor isValid endpoint failed", zap.Error(err))
+					// TODO : write error to responseWrite and return response
+					return
+				}
+			}
+
+			if isValid {
+				fh.function = fn
+				stickinessCookie = maybeValid
+				fh.logger.Debug("chosen function backend's metadata (stickiness cookie)", zap.Any("metadata", fh.function))
+			} else if maybeValid.Type == STRICT {
+				// the cookie is strict and invalid so this request cannot be handled
+				fh.logger.Debug("expiring invalid stickiness cookie")
+				_, err = fh.invalidateStrictStickinessCookie(responseWriter, cookie)
+				if err != nil {
+					fh.logger.Error("error writing invalid stickiness cookie response", zap.Error(err))
+				}
+				return
+			}
+
+		} else {
+			fh.logger.Debug("failed to parse stickiness cookie, will be ignored", zap.Error(err))
+		}
+	}
+
+	if stickinessCookie == nil && fh.httpTrigger != nil && fh.httpTrigger.Spec.FunctionReference.Type == fv1.FunctionReferenceTypeFunctionWeights {
 		// canary deployment. need to determine the function to send request to now
 		fn := getCanaryBackend(fh.functionMap, fh.fnWeightDistributionList)
 		if fn == nil {
@@ -474,9 +576,10 @@ func (fh functionHandler) handler(responseWriter http.ResponseWriter, request *h
 	}
 
 	rrt := &RetryingRoundTripper{
-		logger:      fh.logger.Named("roundtripper"),
-		funcHandler: &fh,
-		funcTimeout: time.Duration(fnTimeout) * time.Second,
+		logger:           fh.logger.Named("roundtripper"),
+		funcHandler:      &fh,
+		funcTimeout:      time.Duration(fnTimeout) * time.Second,
+		stickinessCookie: stickinessCookie,
 	}
 
 	start := time.Now()
@@ -581,6 +684,24 @@ func (roundTripper RetryingRoundTripper) addForwardedHostHeader(req *http.Reques
 
 	req.Header.Set(FORWARDED, host)
 	req.Header.Set(X_FORWARDED_HOST, req.Host)
+}
+
+// isValid checks the executor to determine if the service address is valid
+func (fh functionHandler) isValid(fn *fv1.Function, svcAddress string) (bool, error) {
+	fh.logger.Debug("isValid Called")
+	ctx, cancel := context.WithTimeout(context.Background(), fh.isValidTimeout)
+	defer cancel()
+	isValid, err := fh.executor.IsValid(ctx, fv1.FunctionWithAddress{SvcAddress: svcAddress, Function: fn})
+	if err != nil {
+		statusCode, errMsg := ferror.GetHTTPError(err)
+		fh.logger.Error("error from IsValid",
+			zap.Error(err),
+			zap.String("error_message", errMsg),
+			zap.Any("function", fh.function),
+			zap.Int("status_code", statusCode))
+		return false, err
+	}
+	return isValid, nil
 }
 
 // unTapservice marks the serviceURL in executor's cache as inactive, so that it can be reused

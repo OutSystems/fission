@@ -185,6 +185,17 @@ func Start(ctx context.Context, logger *zap.Logger, port int, executorURL string
 			zap.Duration("default", unTapServiceTimeout))
 	}
 
+	// isValidTimeout is the timeout used as timeout in the request context of isValid
+	isValidTimeoutstr := os.Getenv("ROUTER_IS_VALID_TIMEOUT")
+	isValidTimeout, err := time.ParseDuration(isValidTimeoutstr)
+	if err != nil {
+		isValidTimeout = 30 * time.Second
+		logger.Error("failed to parse isValid timeout duration from 'ROUTER_IS_VALID_TIMEOUT' - set to the default value",
+			zap.Error(err),
+			zap.String("value", isValidTimeoutstr),
+			zap.Duration("default", isValidTimeout))
+	}
+
 	tracingSamplingRateStr := os.Getenv("TRACING_SAMPLING_RATE")
 	tracingSamplingRate, err := strconv.ParseFloat(tracingSamplingRateStr, 64)
 	if err != nil {
@@ -205,14 +216,29 @@ func Start(ctx context.Context, logger *zap.Logger, port int, executorURL string
 			zap.Bool("default", displayAccessLog))
 	}
 
-	triggers := makeHTTPTriggerSet(logger.Named("triggerset"), fmap, fissionClient, kubeClient, executor, &tsRoundTripperParams{
-		timeout:           timeout,
-		timeoutExponent:   timeoutExponent,
-		disableKeepAlive:  disableKeepAlive,
-		keepAliveTime:     keepAliveTime,
-		maxRetries:        maxRetries,
-		svcAddrRetryCount: svcAddrRetryCount,
-	}, isDebugEnv, unTapServiceTimeout, throttler.MakeThrottler(svcAddrUpdateTimeout))
+	stickinessEnableStr := os.Getenv("ROUTER_STICKINESS_ENABLE")
+	stickinessEnable, err := strconv.ParseBool(stickinessEnableStr)
+	if err != nil {
+		stickinessEnable = false
+		logger.Error("failed to parse router stickiness feature toggle from 'ROUTER_STICKINESS_ENABLE' - set to the default value",
+			zap.Error(err),
+			zap.String("value", stickinessEnableStr),
+			zap.Bool("default", stickinessEnable))
+	}
+
+	triggers := makeHTTPTriggerSet(logger.Named("triggerset"), fmap, fissionClient, kubeClient, executor,
+		&tsRoundTripperParams{
+			timeout:           timeout,
+			timeoutExponent:   timeoutExponent,
+			disableKeepAlive:  disableKeepAlive,
+			keepAliveTime:     keepAliveTime,
+			maxRetries:        maxRetries,
+			svcAddrRetryCount: svcAddrRetryCount,
+		},
+		&stickinessParams{
+			enabled: stickinessEnable,
+		},
+		isDebugEnv, unTapServiceTimeout, isValidTimeout, throttler.MakeThrottler(svcAddrUpdateTimeout))
 
 	go metrics.ServeMetrics(ctx, logger)
 

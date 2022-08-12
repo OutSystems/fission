@@ -192,6 +192,9 @@ router:
   ## unTapService is called to free up the resources once the function invocation is done.
   ##
   unTapServiceTimeout: 3600s
+  ## isValidTimeout is the timeout used in the request context of isValid.
+  ## isValid is called to check if a function service referenced by a stickiness cookie is still valid.
+  isValidTimeout: 30s
   ## displayAccessLog display endpoing access logs
   ## Please be aware of enabling logging endpoint access log, it increases
   ## router resource utilization when under heavy workloads.
@@ -239,6 +242,14 @@ router:
     ## maxRetries defines no of retries of a failed request
     ##
     maxRetries: 10
+
+  stickiness:
+    ## If true, router will check incoming requests for a stickiness cookie, requests containing a
+    ## stickiness cookie with a valid service address will be routed to the specified function pod.
+    ##
+    ## If false, router ignores sticky cookies and the default load balancing behaviour applies.
+    ##
+    enabled: false
 
   ## Extend the container specs for the core fission pods.
   ## Can be used to add things like affinty/tolerations/nodeSelectors/etc.
