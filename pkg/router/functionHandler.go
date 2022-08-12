@@ -487,12 +487,12 @@ func (fh functionHandler) parseStickinessCookie(request *http.Request) (*stickin
 	}
 	cookieBytes, err := base64.StdEncoding.DecodeString(cookie.Value)
 	if err != nil {
-		fh.logger.Debug("failed to decode stickiness cookie value", zap.Error(err), zap.String("cookieValue", cookie.Value))
+		fh.logger.Warn("failed to decode stickiness cookie base64 value", zap.Error(err))
 		return nil, nil, err
 	}
 	err = json.Unmarshal(cookieBytes, &stickinessCookie)
 	if err != nil {
-		fh.logger.Debug("failed to unmarshal stickiness cookie", zap.Error(err), zap.String("cookieString", string(cookieBytes)))
+		fh.logger.Warn("failed to unmarshal stickiness cookie JSON", zap.Error(err))
 	}
 	return &stickinessCookie, cookie, err
 }
