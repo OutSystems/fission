@@ -500,7 +500,7 @@ func (fh functionHandler) parseStickinessCookie(request *http.Request) (*stickin
 func (fh functionHandler) invalidateStrictStickinessCookie(responseWriter http.ResponseWriter, cookie *http.Cookie) (int, error) {
 	fh.logger.Debug("invalid stickiness cookie (strict type)", zap.Any("cookie", cookie))
 	cookie.MaxAge = -1
-	responseWriter.Header().Add("Set-Cookie", cookie.String())
+	http.SetCookie(responseWriter, cookie)
 	responseWriter.WriteHeader(http.StatusInternalServerError)
 	return responseWriter.Write([]byte("Invalid stickiness cookie (strict type)"))
 }
