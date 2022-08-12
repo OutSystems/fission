@@ -119,7 +119,6 @@ skaffold-deploy: skaffold-prebuild skaffold-clean
 skaffold-clean:
 	@echo "🔥 Delete fission release"
 	skaffold delete 2>/dev/null || true
-	kubectl delete namespace fission 2>/dev/null || true
 
 ### Release
 release:
