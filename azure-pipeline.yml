@@ -164,6 +164,11 @@ stages:
           - template: setup/docker-acr-login.yml@OutSystems.CICDPlatform.AzureCITemplates
             parameters:
               ContainerRegistry: ${{ parameters.ContainerRegistry }}
+          - template: setup/set-variables-go.yml@OutSystems.CICDPlatform.PhoenixServicePipelineTemplates
+            parameters:
+              ProjectName: ${{ parameters.ProjectName }}
+              ProjectSrcFolder: ${{ parameters.ProjectSrcFolder }}
+              ProjectPath: ${{ parameters.ProjectPath }}
           - task: GoTool@0
             inputs:
               version: "$(GO_VERSION)"
@@ -180,7 +185,7 @@ stages:
               cp cmd/fetcher/Dockerfile.fission-fetcher dist/fetcher_linux_amd64_v1/Dockerfile
               cp cmd/reporter/Dockerfile.reporter dist/reporter_linux_amd64_v1/Dockerfile
               cp cmd/preupgradechecks/Dockerfile.fission-preupgradechecks dist/pre-upgrade-checks_linux_amd64_v1/Dockerfile
-            workingDirectory:  ${{ parameters.ProjectPath }}
+            workingDirectory: $(ProjectPath)
             displayName: 'Run goreleaser build'
           - ${{ each imageName in parameters.DockerImages}}:
             # Pre Docker Build Step
@@ -191,15 +196,6 @@ stages:
                 echo "##vso[task.setvariable variable=DockerImageName;]${{ imageName }}"
                 echo "##vso[task.setvariable variable=DockerFilePath;]${{ parameters.DockerFilePath }}${{ imageName }}${{ parameters.DockerImageSuffix }}"
                 echo "##vso[task.setvariable variable=DockerBuildContext;]${{ parameters.DockerBuildContext }}${{ imageName }}${{ parameters.DockerImageSuffix }}"
-                echo "##vso[task.setvariable variable=ProjectPath;]${{ parameters.ProjectPath }}"
-            # - template: setup/set-variables-go.yml@OutSystems.CICDPlatform.PhoenixServicePipelineTemplates
-            #   parameters:
-            #     DockerImageName: ${{ imageName }}
-            #     DockerFilePath: ${{ parameters.DockerFilePath }}${{ imageName }}${{ parameters.DockerImageSuffix }}
-            #     DockerBuildContext: ${{ parameters.DockerBuildContext }}${{ imageName }}${{ parameters.DockerImageSuffix }}
-            #     ProjectName: ${{ parameters.ProjectName }}
-            #     ProjectSrcFolder: ${{ parameters.ProjectSrcFolder }}
-            #     ProjectPath: ${{ parameters.ProjectPath }}
             # Build the docker image
             - template: build/docker-build.yml@OutSystems.CICDPlatform.AzureCITemplates
               parameters:
