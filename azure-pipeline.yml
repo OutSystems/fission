@@ -196,6 +196,7 @@ stages:
                 echo "##vso[task.setvariable variable=DockerImageName;]${{ imageName }}"
                 echo "##vso[task.setvariable variable=DockerFilePath;]${{ parameters.DockerFilePath }}${{ imageName }}${{ parameters.DockerImageSuffix }}"
                 echo "##vso[task.setvariable variable=DockerBuildContext;]${{ parameters.DockerBuildContext }}${{ imageName }}${{ parameters.DockerImageSuffix }}"
+              displayName: 'Set variables [${{ imageName }}]'
             # Build the docker image
             - template: build/docker-build.yml@OutSystems.CICDPlatform.AzureCITemplates
               parameters:
@@ -224,7 +225,7 @@ stages:
                 Condition: and(succeededOrFailed(), eq('${{ parameters.DoRelease }}', 'true'))
             # Push image to ECR
             - task: ECRPushImage@1
-              displayName: 'Publish Docker image to ECR (version tag)'
+              displayName: 'Publish Docker image to ECR (version tag) [${{ imageName }}]'
               condition: and(succeeded(), eq('${{ parameters.HelmDeploy }}', 'true'))
               inputs:
                 awsCredentials: 'sdlc_datafabric_core'
@@ -236,7 +237,7 @@ stages:
                 pushTag: $(ServiceVersion)
                 autoCreateRepository: true
             - task: ECRPushImage@1
-              displayName: 'Publish Docker image to ECR (latest tag)'
+              displayName: 'Publish Docker image to ECR (latest tag) [${{ imageName }}]'
               condition: and(succeeded(), eq('${{ parameters.HelmDeploy }}', 'true'))
               inputs:
                 awsCredentials: 'sdlc_datafabric_core'
