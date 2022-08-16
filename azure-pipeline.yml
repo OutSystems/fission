@@ -25,6 +25,9 @@ parameters:
   - name: HelmChartName
     type: string
     default: 'fission-all'
+  - name: DockerImageECRRegistry
+    type: string
+    default: '083779802266.dkr.ecr.eu-central-1.amazonaws.com'
   - name: HelmChartECRRepository
     type: string
     default: '083779802266.dkr.ecr.eu-central-1.amazonaws.com/helm/'
@@ -57,7 +60,7 @@ parameters:
     default: true
   - name: DoRelease
     type: boolean
-    default: true
+    default: false
   - name: ReleaseVersion
     type: string
     default: 'v1.17.0-rc1-0.0.1'
@@ -282,6 +285,18 @@ stages:
               HELM_EXPERIMENTAL_OCI: 1
               AWS_ACCESS_KEY_ID: $(DatafabricAWSKey)
               AWS_SECRET_ACCESS_KEY: $(DatafabricAWSSecretKey)
+          - task: HelmDeploy@0
+            displayName: Upgrade fission in eks cluster
+            inputs:
+              connectionType: 'Kubernetes Service Connection'
+              kubernetesServiceConnection: 'sdlc_datafabric_core_eks_cluster'
+              namespace: '${{ parameters.ProjectName }}'
+              command: 'upgrade'
+              chartType: 'FilePath'
+              chartPath: '$(ProjectPath)/charts/fission-all'
+              overrideValues: 'fission_bundle.repository=${{parameters.DockerImageECRRegistry}},fission_bundle.image=fission-bundle,fission_bundle.imagePullSecrets[0].name=regcred,preUpgradeChecks.enabled=false,canaryDeployment.enabled=true,prometheus.serviceEndpoint=http://prometheus-kube-prometheus-prometheus.prometheus.svc.cluster.local:9090'
+              releaseName: '${{ parameters.ProjectName }}'
+              force: true
 
       ########################################################################################################################
       # CREATE A NEW GIT RELEASE
