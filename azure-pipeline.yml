@@ -57,7 +57,7 @@ parameters:
     default: true
   - name: DoRelease
     type: boolean
-    default: false
+    default: true
   - name: ReleaseVersion
     type: string
     default: 'v1.17.0-rc1-0.0.1'
