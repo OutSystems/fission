@@ -285,6 +285,7 @@ stages:
               HELM_EXPERIMENTAL_OCI: 1
               AWS_ACCESS_KEY_ID: $(DatafabricAWSKey)
               AWS_SECRET_ACCESS_KEY: $(DatafabricAWSSecretKey)
+
           - task: HelmDeploy@0
             displayName: Upgrade fission in eks cluster
             inputs:
@@ -296,7 +297,7 @@ stages:
               chartPath: '$(ProjectPath)/charts/fission-all'
               overrideValues: 'fission_bundle.repository=${{parameters.DockerImageECRRegistry}},fission_bundle.image=fission-bundle,fission_bundle.imagePullSecrets[0].name=regcred,preUpgradeChecks.enabled=false,canaryDeployment.enabled=true,prometheus.serviceEndpoint=http://prometheus-kube-prometheus-prometheus.prometheus.svc.cluster.local:9090'
               releaseName: '${{ parameters.ProjectName }}'
-              force: true
+              arguments: '--recreate-pods'
 
       ########################################################################################################################
       # CREATE A NEW GIT RELEASE
