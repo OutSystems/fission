@@ -174,9 +174,9 @@ stages:
               GOOS=linux GOARCH=amd64 goreleaser build --snapshot --rm-dist --single-target
               cp cmd/fission-bundle/Dockerfile.fission-bundle dist/fission-bundle_linux_amd64_v1/Dockerfile
               cp cmd/builder/Dockerfile.fission-builder dist/builder_linux_amd64_v1/Dockerfile
-	            cp cmd/fetcher/Dockerfile.fission-fetcher dist/fetcher_linux_amd64_v1/Dockerfile
-	            cp cmd/reporter/Dockerfile.reporter dist/reporter_linux_amd64_v1/Dockerfile
-	            cp cmd/preupgradechecks/Dockerfile.fission-preupgradechecks dist/pre-upgrade-checks_linux_amd64_v1/Dockerfile
+              cp cmd/fetcher/Dockerfile.fission-fetcher dist/fetcher_linux_amd64_v1/Dockerfile
+              cp cmd/reporter/Dockerfile.reporter dist/reporter_linux_amd64_v1/Dockerfile
+              cp cmd/preupgradechecks/Dockerfile.fission-preupgradechecks dist/pre-upgrade-checks_linux_amd64_v1/Dockerfile
             workingDirectory: $(ProjectPath)
             displayName: 'Run goreleaser build'
           - ${{ each imageName in parameters.DockerImages}}:
