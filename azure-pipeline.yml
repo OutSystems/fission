@@ -186,7 +186,7 @@ stages:
                     ${{ pair.key }}: ${{ pair.value }}
             - template: setup/set-variables-go.yml@OutSystems.CICDPlatform.PhoenixServicePipelineTemplates
               parameters:
-                DockerImageName: ${{ DockerImageName }}
+                DockerImageName: ${{ imageName }}
                 DockerFilePath: ${{ parameters.DockerFilePath }}${{ imageName }}${{ parameters.DockerImageSuffix }}
                 DockerBuildContext: ${{ parameters.DockerBuildContext }}${{ imageName }}${{ parameters.DockerImageSuffix }}
                 ProjectName: ${{ parameters.ProjectName }}
