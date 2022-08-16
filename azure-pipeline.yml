@@ -295,9 +295,8 @@ stages:
               command: 'upgrade'
               chartType: 'FilePath'
               chartPath: '$(ProjectPath)/charts/fission-all'
-              overrideValues: 'fission_bundle.repository=${{parameters.DockerImageECRRegistry}},fission_bundle.image=fission-bundle,fission_bundle.imagePullSecrets[0].name=regcred,preUpgradeChecks.enabled=false,canaryDeployment.enabled=true,prometheus.serviceEndpoint=http://prometheus-kube-prometheus-prometheus.prometheus.svc.cluster.local:9090'
               releaseName: '${{ parameters.ProjectName }}'
-              arguments: '--recreate-pods'
+              arguments: '--recreate-pods --reuse-values'
 
       ########################################################################################################################
       # CREATE A NEW GIT RELEASE
