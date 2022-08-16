@@ -100,7 +100,6 @@ trigger:
   branches:
     include:
       - main-os
-      - feature/gaa/sprint-8.1/RDDFC-615/push_all_docker_images_to_registries
 
 pr: none
 
