@@ -36,7 +36,7 @@ deploy:
         preUpgradeChecks.image: pre-upgrade-checks
       namespace: fission
       setValues:
-        analytics: false
+        analytics.enabled: false
         debugEnv: false
         fetcher.imageTag: ""
         imageTag: ""

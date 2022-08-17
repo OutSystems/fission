@@ -1,4 +1,4 @@
-{{- if .Values.analytics }}
+{{- if .Values.analytics.enabled }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -35,6 +35,7 @@ spec:
         {{- else }}
           image: {{ .Values.postInstallReportImage }}
         {{- end }}
+          resources: {{- toYaml .Values.analytics.resources | indent 10 }}
           imagePullPolicy: {{ .Values.pullPolicy }}
           command: [ "/reporter" ]
           args: ["event", "-c", "fission-use", "-a", "helm-post-install", "-l", "{{ .Chart.Name }}-{{ .Chart.Version }}"]

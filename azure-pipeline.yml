@@ -2,21 +2,32 @@ parameters:
   - name: ProjectName
     type: string
     default: 'fission'
-  - name: DockerImageName
-    type: string
-    default: 'fission-bundle'
+  - name: DockerImages
+    type: object
+    default:
+    - fission-bundle
+    - builder
+    - fetcher
+    - reporter
+    - pre-upgrade-checks
   - name: DockerBuildArguments
     type: string
     default: ''
   - name: DockerBuildContext
     type: string
-    default: '$(System.DefaultWorkingDirectory)/fission/dist/fission-bundle_linux_amd64_v1'
+    default: '$(System.DefaultWorkingDirectory)/fission/dist/'
   - name: DockerFilePath
     type: string
-    default: '$(System.DefaultWorkingDirectory)/fission/dist/fission-bundle_linux_amd64_v1'
+    default: '$(System.DefaultWorkingDirectory)/fission/dist/'
+  - name: DockerImageSuffix
+    type: string
+    default: '_linux_amd64_v1'
   - name: HelmChartName
     type: string
     default: 'fission-all'
+  - name: DockerImageECRRegistry
+    type: string
+    default: '083779802266.dkr.ecr.eu-central-1.amazonaws.com'
   - name: HelmChartECRRepository
     type: string
     default: '083779802266.dkr.ecr.eu-central-1.amazonaws.com/helm/'
@@ -116,7 +127,6 @@ stages:
               IsGitLFS: ${{ parameters.IsGitLFS }}
           - template: setup/set-variables-go.yml@OutSystems.CICDPlatform.PhoenixServicePipelineTemplates
             parameters:
-              DockerImageName: ${{ parameters.DockerImageName }}
               ProjectName: ${{ parameters.ProjectName }}
               ProjectSrcFolder: ${{ parameters.ProjectSrcFolder }}
               ProjectPath: ${{ parameters.ProjectPath }}
@@ -153,17 +163,14 @@ stages:
             parameters:
               IsGitLFS: ${{ parameters.IsGitLFS }}
               FetchSubmodules: ${{ parameters.FetchSubmodules }}
-          - template: setup/set-variables-go.yml@OutSystems.CICDPlatform.PhoenixServicePipelineTemplates
-            parameters:
-              DockerImageName: ${{ parameters.DockerImageName }}
-              DockerFilePath: ${{ parameters.DockerFilePath }}
-              DockerBuildContext: ${{ parameters.DockerBuildContext }}
-              ProjectName: ${{ parameters.ProjectName }}
-              ProjectSrcFolder: ${{ parameters.ProjectSrcFolder }}
-              ProjectPath: ${{ parameters.ProjectPath }}
           - template: setup/docker-acr-login.yml@OutSystems.CICDPlatform.AzureCITemplates
             parameters:
               ContainerRegistry: ${{ parameters.ContainerRegistry }}
+          - template: setup/set-variables-go.yml@OutSystems.CICDPlatform.PhoenixServicePipelineTemplates
+            parameters:
+              ProjectName: ${{ parameters.ProjectName }}
+              ProjectSrcFolder: ${{ parameters.ProjectSrcFolder }}
+              ProjectPath: ${{ parameters.ProjectPath }}
           - task: GoTool@0
             inputs:
               version: "$(GO_VERSION)"
@@ -176,63 +183,73 @@ stages:
               echo "Running goreleaser build"
               GOOS=linux GOARCH=amd64 goreleaser build --snapshot --rm-dist --single-target
               cp cmd/fission-bundle/Dockerfile.fission-bundle dist/fission-bundle_linux_amd64_v1/Dockerfile
+              cp cmd/builder/Dockerfile.fission-builder dist/builder_linux_amd64_v1/Dockerfile
+              cp cmd/fetcher/Dockerfile.fission-fetcher dist/fetcher_linux_amd64_v1/Dockerfile
+              cp cmd/reporter/Dockerfile.reporter dist/reporter_linux_amd64_v1/Dockerfile
+              cp cmd/preupgradechecks/Dockerfile.fission-preupgradechecks dist/pre-upgrade-checks_linux_amd64_v1/Dockerfile
             workingDirectory: $(ProjectPath)
             displayName: 'Run goreleaser build'
-          # Pre Docker Build Step
-          - ${{ each step in parameters.PreDockerBuild }}:
-              - ${{ each pair in step }}:
-                  ${{ pair.key }}: ${{ pair.value }}
-          # Build the docker image
-          - template: build/docker-build.yml@OutSystems.CICDPlatform.AzureCITemplates
-            parameters:
-              DockerfilePath: $(DockerFilePath)
-              BuildContext: $(DockerBuildContext)
-              BuildArguments: >
-                -t $(DockerImageName):$(ServiceVersion)
-                -t $(CoreACRUri)/$(DockerImageName):$(ServiceVersion)
-                -t $(DockerImageName):latest
-                ${{ parameters.DockerBuildArguments }}
-                $(MAVEN_OS_CREDENTIALS_DOCKER_PARAMETERS)
-          # Post Docker Build Step
-          - ${{ each step in parameters.PostDockerBuild }}:
-              - ${{ each pair in step }}:
-                  ${{ pair.key }}: ${{ pair.value }}
+          - ${{ each imageName in parameters.DockerImages}}:
+            # Pre Docker Build Step
+            - ${{ each step in parameters.PreDockerBuild }}:
+                - ${{ each pair in step }}:
+                    ${{ pair.key }}: ${{ pair.value }}
+            - bash: |
+                echo "##vso[task.setvariable variable=DockerImageName;]${{ imageName }}"
+                echo "##vso[task.setvariable variable=DockerFilePath;]${{ parameters.DockerFilePath }}${{ imageName }}${{ parameters.DockerImageSuffix }}"
+                echo "##vso[task.setvariable variable=DockerBuildContext;]${{ parameters.DockerBuildContext }}${{ imageName }}${{ parameters.DockerImageSuffix }}"
+              displayName: 'Set variables [${{ imageName }}]'
+            # Build the docker image
+            - template: build/docker-build.yml@OutSystems.CICDPlatform.AzureCITemplates
+              parameters:
+                DockerfilePath: $(DockerFilePath)
+                BuildContext: $(DockerBuildContext)
+                BuildArguments: >
+                  -t $(DockerImageName):$(ServiceVersion)
+                  -t $(CoreACRUri)/$(DockerImageName):$(ServiceVersion)
+                  -t $(DockerImageName):latest
+                  ${{ parameters.DockerBuildArguments }}
+                  $(MAVEN_OS_CREDENTIALS_DOCKER_PARAMETERS)
+            # Post Docker Build Step
+            - ${{ each step in parameters.PostDockerBuild }}:
+                - ${{ each pair in step }}:
+                    ${{ pair.key }}: ${{ pair.value }}
 
-          ########################################################################################################################
-          # PUSH TO ACR AND ECR
-          ########################################################################################################################
-          # Push to Core ACR on pass or fail
-          - template: publish/docker-push.yml@OutSystems.CICDPlatform.AzureCITemplates
-            parameters:
-              ServiceConnection: 'SDLC EdenCore'
-              SourceImageName: $(DockerImageName)
-              SourceImageTag: $(ServiceVersion)
-              Condition: and(succeededOrFailed(), eq('${{ parameters.DoRelease }}', 'true'))
-          # Push image to ECR
-          - task: ECRPushImage@1
-            displayName: 'Publish Docker image to ECR (version tag)'
-            condition: and(succeeded(), eq('${{ parameters.HelmDeploy }}', 'true'))
-            inputs:
-              awsCredentials: 'sdlc_datafabric_core'
-              regionName: 'eu-central-1'
-              imageSource: 'imagename'
-              sourceImageName: $(DockerImageName)
-              sourceImageTag: $(ServiceVersion)
-              repositoryName: $(DockerImageName)
-              pushTag: $(ServiceVersion)
-              autoCreateRepository: true
-          - task: ECRPushImage@1
-            displayName: 'Publish Docker image to ECR (latest tag)'
-            condition: and(succeeded(), eq('${{ parameters.HelmDeploy }}', 'true'))
-            inputs:
-              awsCredentials: 'sdlc_datafabric_core'
-              regionName: 'eu-central-1'
-              imageSource: 'imagename'
-              sourceImageName: $(DockerImageName)
-              sourceImageTag: $(ServiceVersion)
-              repositoryName: $(DockerImageName)
-              pushTag: latest
-              autoCreateRepository: true
+            ########################################################################################################################
+            # PUSH TO ACR AND ECR
+            ########################################################################################################################
+            # Push to Core ACR on pass or fail
+            - template: publish/docker-push.yml@OutSystems.CICDPlatform.AzureCITemplates
+              parameters:
+                ServiceConnection: 'SDLC EdenCore'
+                SourceImageName: $(DockerImageName)
+                SourceImageTag: $(ServiceVersion)
+                Condition: and(succeededOrFailed(), eq('${{ parameters.DoRelease }}', 'true'))
+            # Push image to ECR
+            - task: ECRPushImage@1
+              displayName: 'Publish Docker image to ECR (version tag) [${{ imageName }}]'
+              condition: and(succeeded(), eq('${{ parameters.HelmDeploy }}', 'true'))
+              inputs:
+                awsCredentials: 'sdlc_datafabric_core'
+                regionName: 'eu-central-1'
+                imageSource: 'imagename'
+                sourceImageName: $(DockerImageName)
+                sourceImageTag: $(ServiceVersion)
+                repositoryName: $(DockerImageName)
+                pushTag: $(ServiceVersion)
+                autoCreateRepository: true
+            - task: ECRPushImage@1
+              displayName: 'Publish Docker image to ECR (latest tag) [${{ imageName }}]'
+              condition: and(succeeded(), eq('${{ parameters.HelmDeploy }}', 'true'))
+              inputs:
+                awsCredentials: 'sdlc_datafabric_core'
+                regionName: 'eu-central-1'
+                imageSource: 'imagename'
+                sourceImageName: $(DockerImageName)
+                sourceImageTag: $(ServiceVersion)
+                repositoryName: $(DockerImageName)
+                pushTag: latest
+                autoCreateRepository: true
           # Package and push Helm Chart
           - task: HelmInstaller@1
             displayName: Helm installer
@@ -267,6 +284,18 @@ stages:
               HELM_EXPERIMENTAL_OCI: 1
               AWS_ACCESS_KEY_ID: $(DatafabricAWSKey)
               AWS_SECRET_ACCESS_KEY: $(DatafabricAWSSecretKey)
+
+          - task: HelmDeploy@0
+            displayName: Upgrade fission in eks cluster
+            inputs:
+              connectionType: 'Kubernetes Service Connection'
+              kubernetesServiceConnection: 'sdlc_datafabric_core_eks_cluster'
+              namespace: '${{ parameters.ProjectName }}'
+              command: 'upgrade'
+              chartType: 'FilePath'
+              chartPath: '$(ProjectPath)/charts/fission-all'
+              releaseName: '${{ parameters.ProjectName }}'
+              arguments: '--recreate-pods --reuse-values'
 
       ########################################################################################################################
       # CREATE A NEW GIT RELEASE
