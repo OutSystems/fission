@@ -295,7 +295,9 @@ stages:
               chartType: 'FilePath'
               chartPath: '$(ProjectPath)/charts/fission-all'
               releaseName: '${{ parameters.ProjectName }}'
-              arguments: '--recreate-pods --reuse-values'
+              force: true
+              recreate: true
+              arguments: '--reuse-values'
 
       ########################################################################################################################
       # CREATE A NEW GIT RELEASE
